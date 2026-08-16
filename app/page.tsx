@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Organization from "./components/Organization";
+import AgentManager from "./components/AgentManager";
+import RoomsManager from "./components/RoomsManager";
+import AuthGuard, { useCurrentUser } from "./components/AuthGuard";
 
 type View =
   | "intake"
@@ -13,7 +17,10 @@ type View =
   | "rooms"
   | "ledger"
   | "docs"
-  | "developer";
+  | "developer"
+  | "organization"
+  | "agents"
+  | "agent-workflows";
 
 type QuoteMode = "BEST VALUE" | "HIGHEST SCORE" | "LOWEST COST" | "FASTEST";
 type Capability =
@@ -192,13 +199,15 @@ type RoomDefinition = {
 };
 
 const navItems: Array<{ code: string; label: string; view: View }> = [
-  { code: "01", label: "COMMAND", view: "intake" },
-  { code: "02", label: "WORKFLOWS", view: "workflow" },
-  { code: "03", label: "CONTRACTORS", view: "contractors" },
-  { code: "04", label: "QUESTS", view: "quests" },
-  { code: "05", label: "ROOMS", view: "rooms" },
-  { code: "06", label: "LEDGER", view: "ledger" },
-  { code: "07", label: "DOCS", view: "docs" },
+  { code: "01", label: "组织架构", view: "organization" },
+  { code: "02", label: "AGENT管理", view: "agents" },
+  { code: "03", label: "COMMAND", view: "intake" },
+  { code: "04", label: "WORKFLOWS", view: "workflow" },
+  { code: "05", label: "CONTRACTORS", view: "contractors" },
+  { code: "06", label: "QUESTS", view: "quests" },
+  { code: "07", label: "ROOMS", view: "rooms" },
+  { code: "08", label: "LEDGER", view: "ledger" },
+  { code: "09", label: "DOCS", view: "docs" },
 ];
 
 const initialNeedBriefFields: NeedBriefField[] = [
@@ -1622,7 +1631,16 @@ function formatFileSize(bytes: number) {
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>("intake");
+  return (
+    <AuthGuard>
+      <HomeContent />
+    </AuthGuard>
+  );
+}
+
+function HomeContent() {
+  const currentUser = useCurrentUser()!;
+  const [view, setView] = useState<View>("organization");
   const [request, setRequest] = useState(
     "We need a competitor intelligence workflow for our APAC fintech team.",
   );
@@ -2275,8 +2293,8 @@ export default function Home() {
         <button className="developer-link" onClick={() => setView("developer")} type="button">
           FOR DEVELOPERS
         </button>
-        <button className="identity-button" type="button">
-          D. LEE <span className="identity-role">OPERATOR</span>
+        <button className="identity-button" type="button" onClick={async () => { const { logout } = await import("./lib/auth"); await logout(); window.location.reload(); }}>
+          {currentUser.name || currentUser.email} <span className="identity-role">退出</span>
         </button>
       </header>
 
@@ -2304,6 +2322,9 @@ export default function Home() {
         </aside>
 
         <section className={`command-stage view-${view}`}>
+          {view === "organization" && <Organization />}
+          {view === "agents" && <AgentManager />}
+          {view === "rooms" && <RoomsManager />}
           {view === "intake" && (
             <>
               <div className="stage-heading">
@@ -2805,281 +2826,6 @@ export default function Home() {
                   <p>Run a capped test against a desensitized Quest pack; no Room data or external action is allowed.</p>
                 </div>
                 <button onClick={() => openRouteTest()} type="button">RUN ROUTE A TEST →</button>
-              </div>
-            </>
-          )}
-
-          {view === "rooms" && (
-            <>
-              <ScreenHeading eyebrow="ROOMS / ORGANIZATION BOUNDARIES" title="Context stays where it belongs." subtitle="Agent identity, customer context, and engagement data remain strictly separated." />
-              <div className="room-definition-banner">
-                <span>WHAT IS A ROOM?</span>
-                <p>
-                  An isolated runtime, data, key, memory, budget, and audit boundary. A Quest
-                  describes work publicly; a contract creates an Engagement Room; exact Agent
-                  versions receive the minimum temporary grants required to execute it.
-                </p>
-                <button onClick={() => openDocs("ROOMS")} type="button">READ ROOM MODEL →</button>
-              </div>
-              <div className="room-layout">
-                <section className="room-list">
-                  {roomDefinitions.map((room) => {
-                    const status =
-                      roomStatusOverrides[room.id] ??
-                      (room.id === "ER–8842" && deployed ? "ACTIVE" : room.status);
-                    const capsuleCount =
-                      room.capsules.length + (extraRoomCapsules[room.id]?.length ?? 0);
-                    return (
-                    <button
-                      className={`room-card ${selectedRoom.id === room.id ? "active" : ""}`}
-                      key={room.id}
-                      onClick={() => selectRoom(room.id)}
-                      type="button"
-                    >
-                      <span>{room.id} · {room.type}</span>
-                      <strong>{room.name}</strong>
-                      <small>{capsuleCount} CAPSULES · {room.meta}</small>
-                      <em className={`room-status-${status.toLowerCase()}`}>{status}</em>
-                    </button>
-                    );
-                  })}
-                </section>
-                <section className="terminal-panel room-detail">
-                  <div className="panel-bar">
-                    <span>{selectedRoom.id} / {selectedRoom.type}</span>
-                    <span className={`room-status-${selectedRoomStatus.toLowerCase()}`}>{selectedRoomStatus}</span>
-                  </div>
-                  <div className="room-detail-heading">
-                    <div>
-                      <span>{selectedRoom.owner}</span>
-                      <h3>{selectedRoom.name}</h3>
-                      <p>{selectedRoom.purpose}</p>
-                    </div>
-                    <div className="room-budget-meter">
-                      <span>BUDGET USED</span>
-                      <strong>{selectedRoom.used}</strong>
-                      <small>OF {roomBudgetOverrides[selectedRoom.id] ?? selectedRoom.budget}</small>
-                      <i><b style={{ width: selectedRoom.id === "ER–7218" ? "65%" : "53%" }} /></i>
-                    </div>
-                  </div>
-                  <nav aria-label="Room sections" className="room-tabs">
-                    {(["OVERVIEW", "CONTEXT", "AGENTS", "APPROVALS", "RUN LOG", "CONTROLS"] as RoomTab[]).map((tab) => (
-                      <button className={roomTab === tab ? "active" : ""} key={tab} onClick={() => setRoomTab(tab)} type="button">
-                        {tab}
-                        {tab === "APPROVALS" && selectedRoom.approvals.some((approval) => !roomApprovalDecisions[approval.id]) && <span>●</span>}
-                      </button>
-                    ))}
-                  </nav>
-
-                  {roomTab === "OVERVIEW" && (
-                    <>
-                      <div className="room-operating-strip">
-                        <div><span>ROOM STATE</span><strong>{selectedRoomStatus}</strong></div>
-                        <div><span>MOUNTED VERSIONS</span><strong>{String(selectedRoomAgents.length).padStart(2, "0")}</strong></div>
-                        <div><span>CONTEXT CAPSULES</span><strong>{String(selectedRoomCapsules.length).padStart(2, "0")}</strong></div>
-                        <div><span>PENDING APPROVALS</span><strong>{String(selectedRoom.approvals.filter((approval) => !roomApprovalDecisions[approval.id]).length).padStart(2, "0")}</strong></div>
-                      </div>
-                      <div className="boundary-visual">
-                        <div className="organization-core">
-                          <span>{selectedRoom.type === "ORGANIZATION ROOM" ? "ORGANIZATION" : "ENGAGEMENT"}<br />PRIVATE CORE</span>
-                        </div>
-                        {selectedRoomAgents.map((agent) => (
-                          <button className="mounted-agent" key={agent.id} onClick={() => { setRoomAgentInspectId(agent.id); setRoomTab("AGENTS"); }} type="button">
-                            <span>{agent.id}</span><strong>{agent.name}</strong><small>{agent.status} · TEMPORARY GRANT</small>
-                          </button>
-                        ))}
-                        {!selectedRoomAgents.length && <div className="room-empty-boundary">NO AGENT VERSION IS MOUNTED.</div>}
-                      </div>
-                      <div className="room-controls">
-                        <div><span>RETENTION</span><strong>{roomRetentionOverrides[selectedRoom.id] ?? selectedRoom.retention}</strong></div>
-                        <div><span>SECRETS</span><strong>{selectedRoom.secrets}</strong></div>
-                        <div><span>AUDIT</span><strong>{selectedRoom.audit}</strong></div>
-                        <button disabled={selectedRoomStatus === "STOPPED"} onClick={toggleRoomPause} type="button">
-                          {selectedRoomStatus === "PAUSED" ? "RESUME ROOM" : "PAUSE ROOM"}
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {roomTab === "CONTEXT" && (
-                    <div className="room-context-view">
-                      <div className="context-access-levels">
-                        <div><span>LEVEL 01</span><strong>ORGANIZATION PRIVATE</strong><small>Never leaves the Organization Room.</small></div>
-                        <div><span>LEVEL 02</span><strong>ENGAGEMENT CAPSULE</strong><small>Selected fields projected into one contract.</small></div>
-                        <div><span>LEVEL 03</span><strong>AGENT GRANT</strong><small>Exact version, fields, purpose, and expiry.</small></div>
-                      </div>
-                      <div className="context-toolbar">
-                        <div><span>CONTEXT CAPSULES</span><strong>{selectedRoomCapsules.length} BOUNDED DATA PACKS</strong></div>
-                        <button onClick={openContextCapsule} type="button">+ CREATE CAPSULE</button>
-                      </div>
-                      <div className="context-capsule-layout">
-                        <section className="capsule-list">
-                          {selectedRoomCapsules.map((capsule) => (
-                            <button className={selectedCapsule?.id === capsule.id ? "active" : ""} key={capsule.id} onClick={() => setSelectedCapsuleId(capsule.id)} type="button">
-                              <span>{capsule.id} · {capsule.classification}</span>
-                              <strong>{capsule.name}</strong>
-                              <small>{capsule.scope} · {capsule.size}</small>
-                            </button>
-                          ))}
-                        </section>
-                        <aside className="capsule-inspector">
-                          {selectedCapsule ? (
-                            <>
-                              <span>CAPSULE MANIFEST</span>
-                              <h4>{selectedCapsule.name}</h4>
-                              <p>{selectedCapsule.description}</p>
-                              {[
-                                ["CAPSULE ID", selectedCapsule.id],
-                                ["CLASSIFICATION", selectedCapsule.classification],
-                                ["AUTHORIZED SCOPE", selectedCapsule.scope],
-                                ["UPDATED", selectedCapsule.updated],
-                                ["CONTENT INDEX", selectedCapsule.size],
-                                ["MODEL TRAINING", "PROHIBITED"],
-                              ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
-                              <button onClick={() => showToast(`${selectedCapsule.id} ACCESS MANIFEST OPENED`)} type="button">EDIT AUTHORIZATION →</button>
-                            </>
-                          ) : (
-                            <div className="capsule-empty">SELECT A CAPSULE TO INSPECT ITS DATA AND AUTHORIZATION BOUNDARY.</div>
-                          )}
-                        </aside>
-                      </div>
-                    </div>
-                  )}
-
-                  {roomTab === "AGENTS" && (
-                    <div className="room-agents-view">
-                      <div className="room-agents-toolbar">
-                        <div><span>MOUNTED EXECUTABLE VERSIONS</span><strong>{selectedRoomAgents.length} VERSION-SPECIFIC GRANTS</strong></div>
-                        <button onClick={() => { setView("contractors"); showToast("SELECT A VERIFIED VERSION, THEN INSERT IT THROUGH WORKFLOW"); }} type="button">FIND CONTRACTOR</button>
-                      </div>
-                      <div className="room-agent-layout">
-                        <section className="room-agent-list">
-                          {selectedRoomAgents.map((agent) => (
-                            <button className={inspectedRoomAgent?.id === agent.id ? "active" : ""} key={agent.id} onClick={() => setRoomAgentInspectId(agent.id)} type="button">
-                              <span>{agent.id}</span>
-                              <div><strong>{agent.name} <small>{agent.version}</small></strong><em>{agent.role}</em></div>
-                              <b>{agent.status}</b>
-                              <i>{agent.expires}</i>
-                            </button>
-                          ))}
-                        </section>
-                        <aside className="room-agent-inspector">
-                          {inspectedRoomAgent ? (
-                            <>
-                              <span>ROOM MOUNT MANIFEST</span>
-                              <h4>{inspectedRoomAgent.name} {inspectedRoomAgent.version}</h4>
-                              {[
-                                ["ROLE", inspectedRoomAgent.role],
-                                ["CONTEXT GRANT", inspectedRoomAgent.access],
-                                ["STATUS", inspectedRoomAgent.status],
-                                ["EXPIRES", inspectedRoomAgent.expires],
-                                ["PERMISSIONS", inspectedRoomAgent.permissions],
-                                ["CROSS-ROOM ACCESS", "DENIED"],
-                              ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
-                              <button onClick={() => showToast(`${inspectedRoomAgent.id} GRANT EDITOR OPENED`)} type="button">EDIT GRANT</button>
-                              <button className="danger-outline" onClick={() => showToast(`${inspectedRoomAgent.id} REVOKE REQUIRES ROOM REVALIDATION`)} type="button">REVOKE VERSION</button>
-                            </>
-                          ) : (
-                            <div className="capsule-empty">SELECT A MOUNTED VERSION TO INSPECT ITS EXACT DATA, TOOL, AND TIME BOUNDARY.</div>
-                          )}
-                        </aside>
-                      </div>
-                    </div>
-                  )}
-
-                  {roomTab === "APPROVALS" && (
-                    <div className="room-approvals-view">
-                      <div className="room-view-intro">
-                        <span>HUMAN CONTROL QUEUE</span>
-                        <strong>Agents may request. Only an authorized operator can release.</strong>
-                        <p>Approval is scoped to one action, one cost, one version, and one expiry window.</p>
-                      </div>
-                      <div className="approval-queue">
-                        {selectedRoom.approvals.map((approval) => {
-                          const decision = roomApprovalDecisions[approval.id];
-                          return (
-                            <div className={decision ? "decided" : ""} key={approval.id}>
-                              <span>{approval.id} · {approval.risk}</span>
-                              <div><strong>{approval.action}</strong><small>REQUESTED BY {approval.requester}</small></div>
-                              <em>{approval.cost}</em>
-                              <i>{decision ?? approval.time}</i>
-                              {!decision ? (
-                                <section>
-                                  <button onClick={() => decideRoomApproval(approval.id, "DENIED")} type="button">DENY</button>
-                                  <button onClick={() => decideRoomApproval(approval.id, "APPROVED")} type="button">APPROVE</button>
-                                </section>
-                              ) : (
-                                <b>{decision}</b>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {!selectedRoom.approvals.length && <div className="approval-empty">NO ACTION IS WAITING FOR HUMAN APPROVAL.</div>}
-                      </div>
-                    </div>
-                  )}
-
-                  {roomTab === "RUN LOG" && (
-                    <div className="room-log-view">
-                      <div className="room-log-toolbar">
-                        <div><span>IMMUTABLE AUDIT TRAIL</span><strong>{selectedRoom.logs.length} RECENT EVENTS</strong></div>
-                        <select aria-label="Filter Room log" value={roomLogFilter} onChange={(event) => setRoomLogFilter(event.target.value)}>
-                          <option>ALL EVENTS</option><option>BLOCKED & PENDING</option><option>AGENT: SIGNALSCOUT</option><option>AGENT: DELTAWATCH</option><option>AGENT: D. LEE</option>
-                        </select>
-                        <button onClick={() => showToast(`${selectedRoom.id} AUDIT EXPORT PREPARED`)} type="button">EXPORT AUDIT</button>
-                      </div>
-                      <div className="room-log-table">
-                        {selectedRoomLogs.map((log, index) => (
-                          <div key={`${log.time}-${index}`}>
-                            <span>{log.time}</span><strong>{log.event}</strong><em>{log.actor}</em><b className={`log-${log.status.toLowerCase()}`}>{log.status}</b><p>{log.detail}</p>
-                          </div>
-                        ))}
-                        {!selectedRoomLogs.length && <div className="log-empty">NO EVENTS MATCH THIS FILTER.</div>}
-                      </div>
-                    </div>
-                  )}
-
-                  {roomTab === "CONTROLS" && (
-                    <div className="room-controls-view">
-                      <div className="room-control-grid">
-                        <section>
-                          <span>RETENTION POLICY</span>
-                          <strong>{roomRetentionOverrides[selectedRoom.id] ?? selectedRoom.retention}</strong>
-                          <p>Context and generated memory are deleted or returned when the Room expires; audit evidence remains.</p>
-                          <select value={roomRetentionOverrides[selectedRoom.id] ?? selectedRoom.retention} onChange={(event) => setRoomRetentionOverrides((current) => ({ ...current, [selectedRoom.id]: event.target.value }))}>
-                            <option>7 DAYS</option><option>30 DAYS</option><option>45 DAYS</option><option>UNTIL REVOKED</option>
-                          </select>
-                        </section>
-                        <section>
-                          <span>BUDGET CEILING</span>
-                          <strong>{roomBudgetOverrides[selectedRoom.id] ?? selectedRoom.budget}</strong>
-                          <p>The runner pauses before forecast overage. Agents cannot increase their own ceiling.</p>
-                          <select value={roomBudgetOverrides[selectedRoom.id] ?? selectedRoom.budget} onChange={(event) => setRoomBudgetOverrides((current) => ({ ...current, [selectedRoom.id]: event.target.value }))}>
-                            <option>$780 / EPISODE</option><option>$1,000 / MONTH</option><option>$2,500 / MONTH</option><option>$8,000 / MONTH</option>
-                          </select>
-                        </section>
-                        <section>
-                          <span>SECRETS & CONNECTORS</span>
-                          <strong>{selectedRoom.secrets}</strong>
-                          <p>Credentials are never shown to Agent memory. Calls are brokered, scoped, and audited.</p>
-                          <button onClick={() => showToast(`${selectedRoom.id} SECRET ROTATION QUEUED`)} type="button">ROTATE SECRETS</button>
-                        </section>
-                        <section>
-                          <span>ROOM STATE</span>
-                          <strong>{selectedRoomStatus}</strong>
-                          <p>Pause blocks new execution. Stop revokes all grants, credentials, schedules, and pending actions.</p>
-                          <button disabled={selectedRoomStatus === "STOPPED"} onClick={toggleRoomPause} type="button">{selectedRoomStatus === "PAUSED" ? "RESUME ROOM" : "PAUSE ROOM"}</button>
-                        </section>
-                      </div>
-                      <div className="kill-switch-panel">
-                        <div><span>EMERGENCY CONTROL</span><strong>Kill Switch</strong><p>Immediately revoke mounted Agents, connector grants, schedules, and pending external actions. Audit history is preserved.</p></div>
-                        <button disabled={selectedRoomStatus === "STOPPED"} onClick={() => setKillRoomId(selectedRoom.id)} type="button">
-                          {selectedRoomStatus === "STOPPED" ? "ROOM STOPPED" : "ACTIVATE KILL SWITCH"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </section>
               </div>
             </>
           )}
