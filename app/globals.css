@@ -1752,3 +1752,14 @@ textarea::placeholder { color: #476253; }
 .room-check-item:hover { background: rgba(73, 227, 154, 0.05); }
 .room-check-item input[type="checkbox"] { accent-color: var(--green); }
 .room-check-meta { color: var(--muted); font-size: 0.7rem; margin-left: auto; }
+
+/* Room card delete button */
+.room-card .dept-delete-btn {
+  opacity: 0;
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+}
+.room-card:hover .dept-delete-btn {
+  opacity: 1;
+}
