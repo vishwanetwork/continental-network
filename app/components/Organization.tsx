@@ -39,6 +39,7 @@ export default function Organization() {
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<string | null>(null);
   const [confirmDeleteDept, setConfirmDeleteDept] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [operating, setOperating] = useState(false);
 
   const loadData = async () => {
     const [depts, mems] = await Promise.all([getDepartments(), getMembers()]);
@@ -67,6 +68,7 @@ export default function Organization() {
 
   const handleAddDept = async () => {
     if (!newDeptName.trim()) return;
+    setOperating(true);
     await addDepartment({
       id: `dept-${Date.now()}`,
       name: newDeptName.trim(),
@@ -78,13 +80,16 @@ export default function Organization() {
     setNewDeptParent(null);
     setShowAddDept(false);
     await loadData();
+    setOperating(false);
   };
 
   const handleDeleteDept = async (deptId: string) => {
+    setOperating(true);
     await deleteDepartment(deptId);
     if (selectedDeptId === deptId) setSelectedDeptId(null);
     setConfirmDeleteDept(null);
     await loadData();
+    setOperating(false);
   };
 
   const handleAddMember = async () => {
@@ -98,6 +103,7 @@ export default function Organization() {
       return;
     }
     setEmailError("");
+    setOperating(true);
     await addMember({
       id: `m-${Date.now()}`,
       name: newMemberName.trim(),
@@ -110,12 +116,15 @@ export default function Organization() {
     setNewMemberEmail("");
     setShowAddMember(false);
     await loadData();
+    setOperating(false);
   };
 
   const handleDeleteMember = async (memberId: string) => {
+    setOperating(true);
     await deleteMember(memberId);
     setConfirmDeleteMember(null);
     await loadData();
+    setOperating(false);
   };
 
   const handleEditMember = async () => {
@@ -129,6 +138,7 @@ export default function Organization() {
       return;
     }
     setEditEmailError("");
+    setOperating(true);
     // Delete old and create new (no updateMember API)
     await deleteMember(editingMember.id);
     await addMember({
@@ -140,12 +150,15 @@ export default function Organization() {
     });
     setEditingMember(null);
     await loadData();
+    setOperating(false);
   };
 
   const handleEditDept = async (deptId: string, name: string) => {
+    setOperating(true);
     await updateDepartment(deptId, name);
     setEditingDeptId(null);
     await loadData();
+    setOperating(false);
   };
 
   const renderDeptTree = (depts: Department[], level = 0) => {
@@ -191,10 +204,11 @@ export default function Organization() {
   const selectedDept = allDeptsFlatList().find((d) => d.id === selectedDeptId);
   const selectedMembers = selectedDeptId ? getMembersForDept(selectedDeptId) : [];
 
-  if (loading) return <div className="empty-state">Loading...</div>;
+  if (loading) return <div className="loading-overlay"><div className="loading-spinner" /></div>;
 
   return (
     <div className="org-container">
+      {operating && <div className="loading-overlay"><div className="loading-spinner" /></div>}
       <div className="org-header">
         <h2>Organization Management</h2>
         <button className="btn-primary" onClick={() => setShowAddDept(true)}>+ Add Department</button>

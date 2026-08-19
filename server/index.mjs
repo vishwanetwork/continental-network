@@ -19,10 +19,10 @@ const { googleRedirectUri: GOOGLE_REDIRECT_URI, publicAppUrl: PUBLIC_APP_URL } =
 const sessions = new Map();
 
 const pool = mysql.createPool({
-  host: "gateway01.ap-northeast-1.prod.aws.tidbcloud.com",
-  port: 4000,
-  user: "2maWvN2xTnrKcsy.root",
-  password: "8Ianj13vRmQJje0L",
+  host: process.env.DB_HOST || "",
+  port: parseInt(process.env.DB_PORT || "4000"),
+  user: process.env.DB_USER || "",
+  password: process.env.DB_PASSWORD || "",
   waitForConnections: true,
   connectionLimit: 10,
   ssl: { rejectUnauthorized: true },
@@ -465,7 +465,44 @@ app.post("/api/video/status", async (req, res) => {
   }
 });
 
-// 启动
+// ============ DeepSeek Proxy API ============
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY || "";
+const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
+
+app.post("/api/deepseek/chat", async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "messages array is required" });
+    }
+
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages,
+        temperature: 0.7,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: `DeepSeek API error: ${response.status} - ${errorText}` });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message || "DeepSeek call failed" });
+  }
+});
+
+// Start server
 const PORT = 3001;
 initTables()
   .then(() => {

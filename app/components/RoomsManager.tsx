@@ -138,7 +138,7 @@ export default function RoomsManager() {
     saveRooms(updated);
   };
 
-  if (loading) return <div className="empty-state">Loading...</div>;
+  if (loading) return <div className="loading-overlay"><div className="loading-spinner" /></div>;
 
   return (
     <div className="rooms-container">

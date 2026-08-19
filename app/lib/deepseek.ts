@@ -1,6 +1,4 @@
-// DeepSeek API wrapper
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
-const DEEPSEEK_API_KEY = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY || "";
+// DeepSeek API wrapper (calls via server proxy)
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -8,18 +6,10 @@ export interface ChatMessage {
 }
 
 export async function callDeepSeek(messages: ChatMessage[]): Promise<string> {
-  const response = await fetch(DEEPSEEK_API_URL, {
+  const response = await fetch("/api/deepseek/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek-chat",
-      messages,
-      temperature: 0.7,
-      max_tokens: 4096,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
   });
 
   if (!response.ok) {

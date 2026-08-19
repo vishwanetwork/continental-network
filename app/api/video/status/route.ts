@@ -1,4 +1,4 @@
-const ZHIPU_API_KEY = "d489701e4336444ebb9395768ffdd99f.h39snDknPHTUvV7B";
+const ZHIPU_API_KEY = process.env.ZHIPU_API_KEY || "";
 const ZHIPU_BASE = "https://open.bigmodel.cn/api/paas/v4";
 
 export async function POST(request: Request) {

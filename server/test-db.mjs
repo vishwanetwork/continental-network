@@ -1,22 +1,24 @@
 import mysql from "mysql2/promise";
+import { config } from "dotenv";
+config();
 
 async function test() {
   // Try different configurations
   const configs = [
     { label: "SSL + sha2", ssl: { rejectUnauthorized: false }, authPlugins: undefined },
     { label: "SSL disabled", ssl: undefined, authPlugins: undefined },
-    { label: "mysql_native_password", ssl: undefined, authPlugins: { mysql_native_password: () => () => Buffer.from("cGy4Hy5iND4ZDmsM") } },
+    { label: "mysql_native_password", ssl: undefined, authPlugins: { mysql_native_password: () => () => Buffer.from(process.env.TEST_DB_PASSWORD || "") } },
   ];
 
   for (const cfg of configs) {
     try {
       console.log(`\nTrying: ${cfg.label} ...`);
       const conn = await mysql.createConnection({
-        host: "44.248.155.24",
-        port: 3306,
-        user: "workflow",
-        password: "cGy4Hy5iND4ZDmsM",
-        database: "workflow",
+        host: process.env.TEST_DB_HOST || "",
+        port: parseInt(process.env.TEST_DB_PORT || "3306"),
+        user: process.env.TEST_DB_USER || "",
+        password: process.env.TEST_DB_PASSWORD || "",
+        database: process.env.TEST_DB_NAME || "workflow",
         connectTimeout: 10000,
         ssl: cfg.ssl,
       });

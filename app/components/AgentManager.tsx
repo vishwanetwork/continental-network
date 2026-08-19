@@ -41,9 +41,9 @@ export default function AgentManager() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
 
   const [confirmDeleteAgent, setConfirmDeleteAgent] = useState<string | null>(null);
+  const [operating, setOperating] = useState(false);
 
   const loadData = async () => {
-    setLoading(true);
     const [a, d, m] = await Promise.all([getAgents(), getDepartments(), getMembers()]);
     setAgents(a);
     setDepartments(d);
@@ -73,6 +73,7 @@ export default function AgentManager() {
 
   const handleAddAgent = async () => {
     if (!newAgentForm.name.trim()) return;
+    setOperating(true);
     const id = `agent-${Date.now()}`;
     await addAgent({
       id,
@@ -86,17 +87,21 @@ export default function AgentManager() {
     setShowAddAgent(false);
     await loadData();
     setSelectedAgentId(id);
+    setOperating(false);
   };
 
   const handleDeleteAgent = async (agentId: string) => {
+    setOperating(true);
     await deleteAgent(agentId);
     if (selectedAgentId === agentId) setSelectedAgentId(null);
     setConfirmDeleteAgent(null);
     await loadData();
+    setOperating(false);
   };
 
   const handleAssign = async () => {
     if (!selectedAgentId || !assignTargetId) return;
+    setOperating(true);
     let targetName = "";
     if (assignType === "department") {
       targetName = allDeptsFlatList().find((d) => d.id === assignTargetId)?.name || "";
@@ -107,11 +112,14 @@ export default function AgentManager() {
     setShowAssign(false);
     setAssignTargetId("");
     await loadData();
+    setOperating(false);
   };
 
   const handleRemoveAssignment = async (agentId: string, targetId: string) => {
+    setOperating(true);
     await unassignAgent(agentId, targetId);
     await loadData();
+    setOperating(false);
   };
 
   const handleRunDemo = async () => {
@@ -129,17 +137,22 @@ export default function AgentManager() {
       }
 
       if (selectedAgent.type === "video-generator") {
-        // Generate video
+        // Direct video generation from prompt
         setDemoProgress("Calling video generation API...");
         const videoUrl = await generateVideo(demoInput, (status) => setDemoProgress(status));
         setDemoVideoUrl(videoUrl);
         setDemoResult("✅ Video generation complete!");
       } else if (selectedAgent.type === "storyboard-generator") {
-        const result = await generateStoryboard(demoInput, kbContext, demoStyle);
-        setDemoResult(result);
+        // Generate storyboard script only (no video)
+        setDemoProgress("Generating storyboard script...");
+        const storyboard = await generateStoryboard(demoInput, kbContext, demoStyle);
+        setDemoResult(storyboard);
       } else {
-        const result = await generateStoryboard(demoInput, kbContext, demoStyle);
-        setDemoResult(result);
+        // All other types: generate video directly
+        setDemoProgress("Generating video...");
+        const videoUrl = await generateVideo(demoInput, (status) => setDemoProgress(status));
+        setDemoVideoUrl(videoUrl);
+        setDemoResult("✅ Video generation complete!");
       }
     } catch (err: unknown) {
       setDemoError(err instanceof Error ? err.message : "Execution failed");
@@ -163,10 +176,11 @@ export default function AgentManager() {
     return "#ff4444";
   };
 
-  if (loading) return <div className="empty-state">Loading...</div>;
+  if (loading) return <div className="loading-overlay"><div className="loading-spinner" /></div>;
 
   return (
     <div className="agent-container">
+      {operating && <div className="loading-overlay"><div className="loading-spinner" /></div>}
       <div className="agent-header">
         <h2>Agent Management</h2>
         <button className="btn-primary" onClick={() => setShowAddAgent(true)}>+ Create Agent</button>
