@@ -1,0 +1,14 @@
+.git
+.idea
+.next
+.wrangler
+.sites-runtime
+dist
+node_modules
+coverage
+npm-debug.log*
+.env
+.env.*
+!.env.example
+Dockerfile*
+docker-compose*.yml

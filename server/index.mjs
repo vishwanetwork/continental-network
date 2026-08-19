@@ -3,6 +3,7 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import crypto from "crypto";
 import { config } from "dotenv";
+import { getOAuthConfig } from "./oauth-config.mjs";
 config();
 
 const app = express();
@@ -12,7 +13,7 @@ app.use(express.json());
 // ============ Google OAuth Configuration ============
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/api/auth/google/callback";
+const { googleRedirectUri: GOOGLE_REDIRECT_URI, publicAppUrl: PUBLIC_APP_URL } = getOAuthConfig();
 
 // Simple in-memory session store (use Redis/DB in production)
 const sessions = new Map();
@@ -203,7 +204,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
     // Set cookie and redirect back to frontend
     res.setHeader("Set-Cookie", `session_id=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
-    res.redirect("http://localhost:5173");
+    res.redirect(PUBLIC_APP_URL);
   } catch (e) {
     console.error("OAuth error:", e);
     res.status(500).send("OAuth failed: " + e.message);
