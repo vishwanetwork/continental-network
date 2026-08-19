@@ -12,9 +12,9 @@ export type MainView =
   | "rooms";
 
 const navItems: Array<{ code: string; label: string; view: MainView }> = [
-  { code: "01", label: "组织架构", view: "organization" },
-  { code: "02", label: "AGENT管理", view: "agents" },
-  { code: "03", label: "工作流", view: "workflows" },
+  { code: "01", label: "ORGANIZATION", view: "organization" },
+  { code: "02", label: "AGENTS", view: "agents" },
+  { code: "03", label: "WORKFLOWS", view: "workflows" },
   { code: "04", label: "COMMAND", view: "intake" },
   { code: "05", label: "CONTRACTORS", view: "contractors" },
   { code: "06", label: "QUESTS", view: "quests" },

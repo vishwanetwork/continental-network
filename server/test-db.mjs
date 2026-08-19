@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 
 async function test() {
-  // 尝试不同配置
+  // Try different configurations
   const configs = [
     { label: "SSL + sha2", ssl: { rejectUnauthorized: false }, authPlugins: undefined },
     { label: "SSL disabled", ssl: undefined, authPlugins: undefined },
@@ -30,7 +30,7 @@ async function test() {
     }
   }
 
-  // 最后试试纯 TCP 连通性
+  // Last resort: try pure TCP connectivity
   console.log("\n--- TCP connectivity test ---");
   const net = await import("net");
   const socket = net.default.createConnection({ host: "44.248.155.24", port: 3306, timeout: 5000 });

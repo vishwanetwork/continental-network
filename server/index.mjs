@@ -9,12 +9,12 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// ============ Google OAuth 配置 ============
+// ============ Google OAuth Configuration ============
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/api/auth/google/callback";
 
-// 简单的内存 session 存储（生产环境应用 Redis/DB）
+// Simple in-memory session store (use Redis/DB in production)
 const sessions = new Map();
 
 const pool = mysql.createPool({
@@ -27,7 +27,7 @@ const pool = mysql.createPool({
   ssl: { rejectUnauthorized: true },
 });
 
-// 初始化表结构
+// Initialize table schema
 async function initTables() {
   const conn = await pool.getConnection();
   try {
@@ -107,17 +107,17 @@ async function initTables() {
   }
 }
 
-// 确保所有请求使用 workflow 数据库
+// Ensure all requests use the workflow database
 app.use(async (req, res, next) => {
   try {
     await pool.execute("USE workflow");
   } catch (e) {
-    // 如果数据库不存在，initTables 会创建
+    // If the database doesn't exist, initTables will create it
   }
   next();
 });
 
-// ============ Session 中间件 ============
+// ============ Session Middleware ============
 function parseCookies(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -157,7 +157,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
   if (!code) return res.status(400).send("Missing code");
 
   try {
-    // 用 code 换 token
+    // Exchange code for token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -174,13 +174,13 @@ app.get("/api/auth/google/callback", async (req, res) => {
       return res.status(400).send("Token exchange failed: " + JSON.stringify(tokenData));
     }
 
-    // 获取用户信息
+    // Get user info
     const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const googleUser = await userRes.json();
 
-    // 存入数据库
+    // Store in database
     const userId = `user_${crypto.randomUUID().slice(0, 8)}`;
     await pool.execute(
       `INSERT INTO users (id, email, name, avatar, google_id) VALUES (?, ?, ?, ?, ?)
@@ -188,11 +188,11 @@ app.get("/api/auth/google/callback", async (req, res) => {
       [userId, googleUser.email, googleUser.name || "", googleUser.picture || "", googleUser.id || ""]
     );
 
-    // 查出实际的用户记录
+    // Query actual user record
     const [rows] = await pool.execute("SELECT * FROM users WHERE email = ?", [googleUser.email]);
     const dbUser = rows[0];
 
-    // 创建 session
+    // Create session
     const sessionId = crypto.randomUUID();
     sessions.set(sessionId, {
       id: dbUser.id,
@@ -201,7 +201,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
       avatar: dbUser.avatar,
     });
 
-    // 设置 cookie 并重定向回前端
+    // Set cookie and redirect back to frontend
     res.setHeader("Set-Cookie", `session_id=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
     res.redirect("http://localhost:5173");
   } catch (e) {
@@ -226,7 +226,7 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ success: true });
 });
 
-// ============ 部门 API ============
+// ============ Departments API ============
 app.get("/api/departments", async (req, res) => {
   try {
     const [rows] = await pool.execute("SELECT * FROM departments ORDER BY created_at");
@@ -272,7 +272,7 @@ app.delete("/api/departments", async (req, res) => {
   }
 });
 
-// ============ 成员 API ============
+// ============ Members API ============
 app.get("/api/members", async (req, res) => {
   try {
     const [rows] = await pool.execute("SELECT * FROM members ORDER BY created_at");
@@ -349,7 +349,7 @@ app.delete("/api/agents", async (req, res) => {
   }
 });
 
-// ============ Agent 关联 API ============
+// ============ Agent Assignment API ============
 app.post("/api/agents/assign", async (req, res) => {
   try {
     const { agentId, targetType, targetId, targetName } = req.body;
@@ -374,7 +374,7 @@ app.delete("/api/agents/assign", async (req, res) => {
   }
 });
 
-// ============ 视频生成 API (智谱 CogVideoX-3) ============
+// ============ Video Generation API (Zhipu CogVideoX-3) ============
 const ZHIPU_API_KEY = process.env.ZHIPU_API_KEY || "";
 const ZHIPU_BASE = "https://open.bigmodel.cn/api/paas/v4";
 
@@ -404,7 +404,7 @@ app.post("/api/video/generate", async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMsg = `智谱API错误: ${response.status}`;
+      let errorMsg = `Zhipu API error: ${response.status}`;
       try {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.error?.message || errorJson.message || errorMsg;
@@ -415,7 +415,7 @@ app.post("/api/video/generate", async (req, res) => {
     const data = await response.json();
     res.json({ id: data.id || data.task_id || "" });
   } catch (e) {
-    res.status(500).json({ error: e.message || "提交失败" });
+    res.status(500).json({ error: e.message || "Submission failed" });
   }
 });
 
@@ -435,7 +435,7 @@ app.post("/api/video/status", async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMsg = `查询状态失败: ${response.status}`;
+      let errorMsg = `Query status failed: ${response.status}`;
       try {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.error?.message || errorJson.message || errorMsg;
@@ -457,10 +457,10 @@ app.post("/api/video/status", async (req, res) => {
       id,
       status: data.task_status,
       video_url: videoUrl,
-      error: data.task_status === "FAIL" ? (data.message || "生成失败") : undefined,
+      error: data.task_status === "FAIL" ? (data.message || "Generation failed") : undefined,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message || "查询失败" });
+    res.status(500).json({ error: e.message || "Query failed" });
   }
 });
 

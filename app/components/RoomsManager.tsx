@@ -24,13 +24,13 @@ function saveRooms(rooms: Room[]) {
   localStorage.setItem("continental_rooms_v2", JSON.stringify(rooms));
 }
 
-// 根据用户邮箱获取可见的 agent IDs
+// Get visible agent IDs based on user email
 export function getVisibleAgentIds(userEmail: string, members: Member[]): Set<string> | "all" {
   const rooms = loadRooms();
   if (rooms.length === 0) return "all";
 
   const currentMember = members.find((m) => m.email === userEmail);
-  if (!currentMember) return new Set();
+  if (!currentMember) return "all";
 
   const visibleIds = new Set<string>();
   for (const room of rooms) {
@@ -58,8 +58,33 @@ export default function RoomsManager() {
     const [a, d, m] = await Promise.all([getAgents(), getDepartments(), getMembers()]);
     setAgents(a);
     setDepartments(d);
-    setMembers(m);
-    setRooms(loadRooms());
+    // Only keep members that belong to an existing department
+    const deptIds = new Set<string>();
+    const collectDeptIds = (depts: Department[]) => {
+      for (const dept of depts) {
+        deptIds.add(dept.id);
+        if (dept.children) collectDeptIds(dept.children);
+      }
+    };
+    collectDeptIds(d);
+    const validMembers = m.filter((member) => deptIds.has(member.departmentId));
+    setMembers(validMembers);
+    // Clean up stale member/agent IDs from rooms that no longer exist
+    const memberIdSet = new Set(validMembers.map((member) => member.id));
+    const agentIdSet = new Set(a.map((agent) => agent.id));
+    const currentRooms = loadRooms();
+    let dirty = false;
+    const cleanedRooms = currentRooms.map((room) => {
+      const cleanMembers = room.memberIds.filter((id) => memberIdSet.has(id));
+      const cleanAgents = room.agentIds.filter((id) => agentIdSet.has(id));
+      if (cleanMembers.length !== room.memberIds.length || cleanAgents.length !== room.agentIds.length) {
+        dirty = true;
+        return { ...room, memberIds: cleanMembers, agentIds: cleanAgents };
+      }
+      return room;
+    });
+    if (dirty) saveRooms(cleanedRooms);
+    setRooms(cleanedRooms);
     setLoading(false);
   };
 
@@ -113,19 +138,19 @@ export default function RoomsManager() {
     saveRooms(updated);
   };
 
-  if (loading) return <div className="empty-state">加载中...</div>;
+  if (loading) return <div className="empty-state">Loading...</div>;
 
   return (
     <div className="rooms-container">
       <div className="rooms-header">
-        <h2>Rooms 工作间</h2>
-        <button className="btn-primary" onClick={() => setShowCreateRoom(true)}>+ 创建 Room</button>
+        <h2>Rooms</h2>
+        <button className="btn-primary" onClick={() => setShowCreateRoom(true)}>+ Create Room</button>
       </div>
 
       <div className="rooms-content">
         <div className="rooms-list">
-          <div className="panel-title">Room 列表</div>
-          {rooms.length === 0 && <div className="empty-state">暂无 Room</div>}
+          <div className="panel-title">Room List</div>
+          {rooms.length === 0 && <div className="empty-state">No Rooms yet</div>}
           {rooms.map((room) => (
             <div
               key={room.id}
@@ -134,7 +159,7 @@ export default function RoomsManager() {
             >
               <div className="room-card-name">{room.name}</div>
               <div className="room-card-meta">
-                {room.memberIds.length} 成员 · {room.agentIds.length} Agent
+                {room.memberIds.length} Members · {room.agentIds.length} Agent
               </div>
               <button className="dept-delete-btn" onClick={(e) => { e.stopPropagation(); setConfirmDeleteRoom(room.id); }}>×</button>
             </div>
@@ -147,9 +172,9 @@ export default function RoomsManager() {
               <h3>{selectedRoom.name}</h3>
 
               <div className="room-section">
-                <div className="panel-title">成员（勾选可访问此 Room 的人）</div>
+                <div className="panel-title">Members (check those who can access this Room)</div>
                 <div className="room-checklist">
-                  {members.length === 0 && <div className="empty-state">请先在组织架构中添加成员</div>}
+                  {members.length === 0 && <div className="empty-state">Please add members in the organization first</div>}
                   {members.map((m) => (
                     <label key={m.id} className="room-check-item">
                       <input
@@ -158,16 +183,16 @@ export default function RoomsManager() {
                         onChange={() => toggleMember(m.id)}
                       />
                       <span>{m.name}</span>
-                      <span className="room-check-meta">{m.email || "无邮箱"}</span>
+                      <span className="room-check-meta">{m.email || "No email"}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
               <div className="room-section">
-                <div className="panel-title">Agent（勾选此 Room 可使用的 Agent）</div>
+                <div className="panel-title">Agents (check Agents available in this Room)</div>
                 <div className="room-checklist">
-                  {agents.length === 0 && <div className="empty-state">请先创建 Agent</div>}
+                  {agents.length === 0 && <div className="empty-state">Please create an Agent first</div>}
                   {agents.map((a) => (
                     <label key={a.id} className="room-check-item">
                       <input
@@ -183,7 +208,7 @@ export default function RoomsManager() {
               </div>
             </div>
           ) : (
-            <div className="empty-state">← 选择一个 Room 管理权限</div>
+            <div className="empty-state">← Select a Room to manage permissions</div>
           )}
         </div>
       </div>
@@ -191,14 +216,14 @@ export default function RoomsManager() {
       {showCreateRoom && (
         <div className="modal-overlay" onClick={() => setShowCreateRoom(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>创建 Room</h3>
+            <h3>Create Room</h3>
             <div className="form-group">
-              <label>Room 名称</label>
-              <input value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="如：市场部工作间" />
+              <label>Room Name</label>
+              <input value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="e.g. Marketing workspace" />
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowCreateRoom(false)}>取消</button>
-              <button className="btn-primary" onClick={handleCreateRoom}>创建</button>
+              <button className="btn-secondary" onClick={() => setShowCreateRoom(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleCreateRoom}>Create</button>
             </div>
           </div>
         </div>
@@ -207,11 +232,11 @@ export default function RoomsManager() {
       {confirmDeleteRoom && (
         <div className="modal-overlay" onClick={() => setConfirmDeleteRoom(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>确认删除</h3>
-            <p>确定要删除该 Room 吗？</p>
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete this Room?</p>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setConfirmDeleteRoom(null)}>取消</button>
-              <button className="btn-danger" onClick={() => handleDeleteRoom(confirmDeleteRoom)}>确认删除</button>
+              <button className="btn-secondary" onClick={() => setConfirmDeleteRoom(null)}>Cancel</button>
+              <button className="btn-danger" onClick={() => handleDeleteRoom(confirmDeleteRoom)}>Confirm Delete</button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-// API 调用封装 — 数据只从数据库读取，无 fallback
+// API wrapper — data is read from database only, no fallback
 import type { Department, Member, Agent, KnowledgeBase } from "../types";
 
 const API_BASE = "/api";
@@ -11,7 +11,7 @@ async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
   return res;
 }
 
-// ============ 部门 ============
+// ============ Departments ============
 export async function getDepartments(): Promise<Department[]> {
   try {
     const res = await apiFetch(`${API_BASE}/departments`);
@@ -84,7 +84,7 @@ export async function deleteDepartment(id: string): Promise<boolean> {
   }
 }
 
-// ============ 成员 ============
+// ============ Members ============
 export async function getMembers(): Promise<Member[]> {
   try {
     const res = await apiFetch(`${API_BASE}/members`);
@@ -180,7 +180,7 @@ export async function unassignAgent(agentId: string, targetId: string): Promise<
   }
 }
 
-// ============ 知识库 ============
+// ============ Knowledge Base ============
 export function getKnowledgeBases(): KnowledgeBase[] {
   if (typeof window === "undefined") return [];
   try {

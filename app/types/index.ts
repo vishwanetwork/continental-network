@@ -1,4 +1,4 @@
-// 组织架构类型
+// Organization types
 export interface Department {
   id: string;
   name: string;
@@ -17,7 +17,7 @@ export interface Member {
   email?: string;
 }
 
-// Agent 类型
+// Agent types
 export interface Agent {
   id: string;
   name: string;
@@ -42,7 +42,7 @@ export interface AgentAssignment {
   targetName: string;
 }
 
-// 工作流类型
+// Workflow types
 export interface Workflow {
   id: string;
   name: string;
@@ -60,7 +60,7 @@ export interface WorkflowStep {
   status?: "pending" | "running" | "completed" | "failed";
 }
 
-// 知识库类型
+// Knowledge base types
 export interface KnowledgeBase {
   id: string;
   name: string;
@@ -75,7 +75,7 @@ export interface KBDocument {
   createdAt: string;
 }
 
-// 视频分镜头脚本
+// Video storyboard
 export interface Storyboard {
   id: string;
   title: string;

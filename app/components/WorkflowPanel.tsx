@@ -12,7 +12,7 @@ export default function WorkflowPanel() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [storyboards, setStoryboards] = useState<Storyboard[]>([]);
 
-  // 分镜头生成状态
+  // Storyboard generation state
   const [productInput, setProductInput] = useState("");
   const [styleInput, setStyleInput] = useState("");
   const [selectedKBId, setSelectedKBId] = useState("");
@@ -20,12 +20,12 @@ export default function WorkflowPanel() {
   const [generatedResult, setGeneratedResult] = useState("");
   const [error, setError] = useState("");
 
-  // 视频生成状态
+  // Video generation state
   const [videoInput, setVideoInput] = useState("");
   const [videoGenerating, setVideoGenerating] = useState(false);
   const [videoResult, setVideoResult] = useState("");
 
-  // 知识库管理
+  // Knowledge base management
   const [newDocName, setNewDocName] = useState("");
   const [newDocContent, setNewDocContent] = useState("");
   const [showAddDoc, setShowAddDoc] = useState(false);
@@ -36,7 +36,7 @@ export default function WorkflowPanel() {
 
   const handleGenerateStoryboard = async () => {
     if (!productInput.trim()) {
-      setError("请输入产品信息");
+      setError("Please enter product information");
       return;
     }
     setError("");
@@ -44,7 +44,7 @@ export default function WorkflowPanel() {
     setGeneratedResult("");
 
     try {
-      // 获取知识库上下文
+      // Get knowledge base context
       let context = "";
       if (selectedKBId) {
         const kb = knowledgeBases.find((k) => k.id === selectedKBId);
@@ -56,12 +56,12 @@ export default function WorkflowPanel() {
       const result = await generateStoryboard(productInput, context, styleInput);
       setGeneratedResult(result);
 
-      // 尝试解析并保存
+      // Try to parse and save
       try {
         const scenes = JSON.parse(result);
         const storyboard: Storyboard = {
           id: `sb-${Date.now()}`,
-          title: `${productInput.slice(0, 20)} - 分镜头脚本`,
+          title: `${productInput.slice(0, 20)} - Storyboard`,
           product: productInput,
           scenes: scenes as StoryboardScene[],
           createdAt: new Date().toISOString().slice(0, 10),
@@ -69,10 +69,10 @@ export default function WorkflowPanel() {
         };
         setStoryboards((prev) => [...prev, storyboard]);
       } catch {
-        // AI 返回内容可能不是纯 JSON，保留原文显示
+        // AI response might not be pure JSON, keep original text for display
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "生成失败，请重试");
+      setError(err instanceof Error ? err.message : "Generation failed, please retry");
     } finally {
       setGenerating(false);
     }
@@ -80,7 +80,7 @@ export default function WorkflowPanel() {
 
   const handleGenerateVideo = async () => {
     if (!videoInput.trim()) {
-      setError("请输入分镜头脚本内容");
+      setError("Please enter storyboard content");
       return;
     }
     setError("");
@@ -91,7 +91,7 @@ export default function WorkflowPanel() {
       const result = await generateVideoScript(videoInput);
       setVideoResult(result);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "生成失败，请重试");
+      setError(err instanceof Error ? err.message : "Generation failed, please retry");
     } finally {
       setVideoGenerating(false);
     }
@@ -127,7 +127,7 @@ export default function WorkflowPanel() {
   const handleCreateKB = () => {
     const newKB: KnowledgeBase = {
       id: `kb-${Date.now()}`,
-      name: "新知识库",
+      name: "New Knowledge Base",
       documents: [],
     };
     const updated = [...knowledgeBases, newKB];
@@ -139,25 +139,25 @@ export default function WorkflowPanel() {
   return (
     <div className="workflow-container">
       <div className="workflow-header">
-        <h2>Agent 工作流</h2>
+        <h2>Agent Workflows</h2>
         <div className="workflow-tabs">
           <button
             className={`tab-btn ${tab === "storyboard" ? "active" : ""}`}
             onClick={() => setTab("storyboard")}
           >
-            📝 分镜头脚本生成
+            📝 Storyboard Generation
           </button>
           <button
             className={`tab-btn ${tab === "video" ? "active" : ""}`}
             onClick={() => setTab("video")}
           >
-            🎬 视频制作指南
+            🎬 Video Production Guide
           </button>
           <button
             className={`tab-btn ${tab === "knowledge" ? "active" : ""}`}
             onClick={() => setTab("knowledge")}
           >
-            📚 知识库管理
+            📚 Knowledge Base
           </button>
         </div>
       </div>
@@ -168,34 +168,34 @@ export default function WorkflowPanel() {
         <div className="workflow-content">
           <div className="workflow-input-section">
             <div className="form-group">
-              <label>产品/主题信息</label>
+              <label>Product / Topic Information</label>
               <textarea
                 value={productInput}
                 onChange={(e) => setProductInput(e.target.value)}
-                placeholder="描述你要制作视频的产品或主题，例如：Continental Network 平台介绍视频，展示 AI Agent 工作流管理功能..."
+                placeholder="Describe the product or topic for the video, e.g.: Continental Network platform intro video showcasing AI Agent workflow management..."
                 rows={4}
               />
             </div>
             <div className="form-group">
-              <label>选择知识库（可选）</label>
+              <label>Select Knowledge Base (optional)</label>
               <select
                 value={selectedKBId}
                 onChange={(e) => setSelectedKBId(e.target.value)}
               >
-                <option value="">不使用知识库</option>
+                <option value="">No knowledge base</option>
                 {knowledgeBases.map((kb) => (
                   <option key={kb.id} value={kb.id}>
-                    {kb.name} ({kb.documents.length} 篇文档)
+                    {kb.name} ({kb.documents.length} docs)
                   </option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>风格要求（可选）</label>
+              <label>Style Requirements (optional)</label>
               <input
                 value={styleInput}
                 onChange={(e) => setStyleInput(e.target.value)}
-                placeholder="例如：科技感、简洁、面向企业用户"
+                placeholder="e.g.: tech-focused, minimalist, enterprise-oriented"
               />
             </div>
             <button
@@ -203,14 +203,14 @@ export default function WorkflowPanel() {
               onClick={handleGenerateStoryboard}
               disabled={generating}
             >
-              {generating ? "⏳ 正在生成..." : "🚀 生成分镜头脚本"}
+              {generating ? "⏳ Generating..." : "🚀 Generate Storyboard"}
             </button>
           </div>
 
           {generatedResult && (
             <div className="workflow-result">
               <div className="result-header">
-                <span>生成结果</span>
+                <span>Generated Result</span>
                 <button
                   className="btn-secondary"
                   onClick={() => {
@@ -218,7 +218,7 @@ export default function WorkflowPanel() {
                     setTab("video");
                   }}
                 >
-                  → 用于视频生成
+                  → Use for Video Generation
                 </button>
               </div>
               <pre className="result-content">{generatedResult}</pre>
@@ -227,12 +227,12 @@ export default function WorkflowPanel() {
 
           {storyboards.length > 0 && (
             <div className="storyboard-history">
-              <div className="panel-title">历史生成记录</div>
+              <div className="panel-title">Generation History</div>
               {storyboards.map((sb) => (
                 <div key={sb.id} className="storyboard-card">
                   <span className="sb-title">{sb.title}</span>
                   <span className="sb-date">{sb.createdAt}</span>
-                  <span className="sb-scenes">{sb.scenes.length} 个镜头</span>
+                  <span className="sb-scenes">{sb.scenes.length} scenes</span>
                 </div>
               ))}
             </div>
@@ -244,11 +244,11 @@ export default function WorkflowPanel() {
         <div className="workflow-content">
           <div className="workflow-input-section">
             <div className="form-group">
-              <label>分镜头脚本内容</label>
+              <label>Storyboard Script Content</label>
               <textarea
                 value={videoInput}
                 onChange={(e) => setVideoInput(e.target.value)}
-                placeholder="粘贴分镜头脚本内容，或从上一步自动导入..."
+                placeholder="Paste storyboard content, or auto-import from previous step..."
                 rows={8}
               />
             </div>
@@ -257,13 +257,13 @@ export default function WorkflowPanel() {
               onClick={handleGenerateVideo}
               disabled={videoGenerating}
             >
-              {videoGenerating ? "⏳ 正在生成..." : "🎬 生成视频制作指南"}
+              {videoGenerating ? "⏳ Generating..." : "🎬 Generate Video Production Guide"}
             </button>
           </div>
 
           {videoResult && (
             <div className="workflow-result">
-              <div className="result-header">视频制作指南</div>
+              <div className="result-header">Video Production Guide</div>
               <pre className="result-content">{videoResult}</pre>
             </div>
           )}
@@ -274,10 +274,10 @@ export default function WorkflowPanel() {
         <div className="workflow-content">
           <div className="kb-header">
             <button className="btn-secondary" onClick={handleCreateKB}>
-              + 创建知识库
+              + Create Knowledge Base
             </button>
             <button className="btn-secondary" onClick={() => setShowAddDoc(true)}>
-              + 添加文档
+              + Add Document
             </button>
           </div>
 
@@ -301,30 +301,30 @@ export default function WorkflowPanel() {
           {showAddDoc && (
             <div className="modal-overlay" onClick={() => setShowAddDoc(false)}>
               <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <h3>添加文档到知识库</h3>
+                <h3>Add Document to Knowledge Base</h3>
                 <div className="form-group">
-                  <label>文档名称</label>
+                  <label>Document Name</label>
                   <input
                     value={newDocName}
                     onChange={(e) => setNewDocName(e.target.value)}
-                    placeholder="文档标题"
+                    placeholder="Document title"
                   />
                 </div>
                 <div className="form-group">
-                  <label>文档内容</label>
+                  <label>Document Content</label>
                   <textarea
                     value={newDocContent}
                     onChange={(e) => setNewDocContent(e.target.value)}
-                    placeholder="输入文档内容..."
+                    placeholder="Enter document content..."
                     rows={8}
                   />
                 </div>
                 <div className="modal-actions">
                   <button className="btn-secondary" onClick={() => setShowAddDoc(false)}>
-                    取消
+                    Cancel
                   </button>
                   <button className="btn-primary" onClick={handleAddDocument}>
-                    添加
+                    Add
                   </button>
                 </div>
               </div>

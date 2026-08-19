@@ -23,8 +23,8 @@ export default function ContinentalApp() {
       case "rooms":
         return (
           <div className="legacy-placeholder">
-            <p>此功能来自原始 MVP 演示，正在逐步实现中...</p>
-            <p>请切换到"组织架构"、"AGENT管理"或"工作流"查看已实现的功能</p>
+            <p>This feature is from the original MVP demo and is being progressively implemented...</p>
+            <p>Please switch to "Organization", "Agents" or "Workflows" to view implemented features.</p>
           </div>
         );
       default:

@@ -1,4 +1,4 @@
-// DeepSeek API 调用封装
+// DeepSeek API wrapper
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_API_KEY = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY || "";
 
@@ -39,19 +39,19 @@ export async function generateStoryboard(
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `你是一个专业的视频分镜头脚本编剧。根据提供的产品信息和知识库内容，生成详细的视频分镜头脚本。
-输出格式为JSON数组，每个元素包含：
-- sceneNumber: 镜头编号
-- duration: 建议时长（如 "5s"）
-- visual: 画面描述
-- narration: 旁白/配音文案
-- notes: 制作备注
+      content: `You are a professional video storyboard scriptwriter. Based on the provided product information and knowledge base content, generate a detailed video storyboard script.
+Output format is a JSON array, where each element contains:
+- sceneNumber: scene number
+- duration: suggested duration (e.g. "5s")
+- visual: visual description
+- narration: voiceover/narration text
+- notes: production notes
 
-请生成5-8个镜头的完整脚本。`,
+Please generate a complete script with 5-8 scenes.`,
     },
     {
       role: "user",
-      content: `产品信息：${productInfo}\n\n知识库参考：${knowledgeContext}${style ? `\n\n风格要求：${style}` : ""}`,
+      content: `Product info: ${productInfo}\n\nKnowledge base reference: ${knowledgeContext}${style ? `\n\nStyle requirements: ${style}` : ""}`,
     },
   ];
 
@@ -62,18 +62,18 @@ export async function generateVideoScript(storyboard: string): Promise<string> {
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `你是一个视频制作指导专家。根据分镜头脚本，生成详细的视频制作指南，包括：
-1. 每个镜头的具体拍摄/制作建议
-2. 转场效果建议
-3. 配乐风格建议
-4. 整体节奏把控建议
-5. 后期处理建议
+      content: `You are a video production expert. Based on the storyboard script, generate a detailed video production guide including:
+1. Specific shooting/production suggestions for each scene
+2. Transition effect suggestions
+3. Background music style suggestions
+4. Overall pacing guidance
+5. Post-production suggestions
 
-请用清晰的结构化格式输出。`,
+Please output in a clear structured format.`,
     },
     {
       role: "user",
-      content: `请根据以下分镜头脚本生成视频制作指南：\n\n${storyboard}`,
+      content: `Please generate a video production guide based on the following storyboard script:\n\n${storyboard}`,
     },
   ];
 

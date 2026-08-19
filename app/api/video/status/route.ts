@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMsg = `查询状态失败: ${response.status}`;
+      let errorMsg = `Query status failed: ${response.status}`;
       try {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.error?.message || errorJson.message || errorMsg;
@@ -29,10 +29,10 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
-    // 智谱异步结果格式：task_status 为 SUCCESS/PROCESSING/FAIL
+    // Zhipu async result format: task_status is SUCCESS/PROCESSING/FAIL
     let videoUrl: string | undefined;
     if (data.task_status === "SUCCESS") {
-      // 视频结果在 video_result 中
+      // Video result is in video_result
       const results = data.video_result || data.data?.video_result;
       if (results && results.length > 0) {
         videoUrl = results[0].url;
@@ -43,9 +43,9 @@ export async function POST(request: Request) {
       id,
       status: data.task_status,
       video_url: videoUrl,
-      error: data.task_status === "FAIL" ? (data.message || "生成失败") : undefined,
+      error: data.task_status === "FAIL" ? (data.message || "Generation failed") : undefined,
     });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "查询失败" }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : "Query failed" }, { status: 500 });
   }
 }

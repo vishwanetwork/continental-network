@@ -1,4 +1,4 @@
-// 视频生成 - 通过本地API路由代理Replicate请求（避免CORS）
+// Video generation - proxy requests via local API route (avoid CORS)
 
 export interface VideoGenResponse {
   id: string;
@@ -7,7 +7,7 @@ export interface VideoGenResponse {
   error?: string;
 }
 
-// 提交视频生成任务
+// Submit video generation task
 export async function submitVideoGeneration(prompt: string): Promise<string> {
   const response = await fetch("/api/video/generate", {
     method: "POST",
@@ -17,14 +17,14 @@ export async function submitVideoGeneration(prompt: string): Promise<string> {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `视频生成API错误: ${response.status}`);
+    throw new Error(data.error || `Video generation API error: ${response.status}`);
   }
 
   const data = await response.json();
   return data.id || "";
 }
 
-// 查询视频生成状态
+// Query video generation status
 export async function queryVideoStatus(requestId: string): Promise<VideoGenResponse> {
   const response = await fetch("/api/video/status", {
     method: "POST",
@@ -34,7 +34,7 @@ export async function queryVideoStatus(requestId: string): Promise<VideoGenRespo
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `查询视频状态失败: ${response.status}`);
+    throw new Error(data.error || `Video status query failed: ${response.status}`);
   }
 
   const data = await response.json();
@@ -46,35 +46,35 @@ export async function queryVideoStatus(requestId: string): Promise<VideoGenRespo
   };
 }
 
-// 一站式：提交并轮询等待结果
+// All-in-one: submit and poll for result
 export async function generateVideo(
   prompt: string,
   onProgress?: (status: string) => void
 ): Promise<string> {
-  onProgress?.("提交视频生成任务到智谱...");
+  onProgress?.("Submitting video generation task...");
   const requestId = await submitVideoGeneration(prompt);
 
-  if (!requestId) throw new Error("未获取到任务ID");
+  if (!requestId) throw new Error("Failed to get task ID");
 
-  onProgress?.(`任务已提交 (ID: ${requestId})，等待生成...`);
+  onProgress?.(`Task submitted (ID: ${requestId}), waiting...`);
 
-  // 轮询等待结果（最多10分钟）
+  // Poll for result (max 10 minutes)
   const maxAttempts = 120;
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     const result = await queryVideoStatus(requestId);
-    onProgress?.(`状态: ${result.status} (已等待 ${(i + 1) * 5}秒)`);
+    onProgress?.(`Status: ${result.status} (waited ${(i + 1) * 5}s)`);
 
     if (result.status === "Succeed") {
       if (result.video_url) return result.video_url;
-      throw new Error("视频生成完成但未返回URL");
+      throw new Error("Video generation completed but no URL returned");
     }
 
     if (result.status === "Failed") {
-      throw new Error(result.error || "视频生成失败");
+      throw new Error(result.error || "Video generation failed");
     }
   }
 
-  throw new Error("视频生成超时（等待超过10分钟），请稍后重试");
+  throw new Error("Video generation timed out (over 10 minutes), please try again later");
 }

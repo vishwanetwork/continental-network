@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMsg = `智谱API错误: ${response.status}`;
+      let errorMsg = `Zhipu API error: ${response.status}`;
       try {
         const errorJson = JSON.parse(errorText);
         errorMsg = errorJson.error?.message || errorJson.message || errorMsg;
@@ -33,10 +33,10 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
-    // 智谱返回 task_id 用于异步查询
+    // Zhipu returns task_id for async polling
     const taskId = data.id || data.task_id || "";
     return Response.json({ id: taskId });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "提交失败" }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : "Submission failed" }, { status: 500 });
   }
 }

@@ -11,7 +11,7 @@ import { generateVideo } from "../lib/video-gen";
 import { useCurrentUser } from "./AuthGuard";
 import { getVisibleAgentIds } from "./RoomsManager";
 
-// 读取 Rooms 数据判断 agent 可见性 — 已移至 RoomsManager
+// Agent visibility logic — moved to RoomsManager
 
 export default function AgentManager() {
   const currentUser = useCurrentUser();
@@ -28,7 +28,7 @@ export default function AgentManager() {
   const [assignType, setAssignType] = useState<"member" | "department">("department");
   const [assignTargetId, setAssignTargetId] = useState("");
 
-  // 演示状态
+  // Demo state
   const [showDemo, setShowDemo] = useState(false);
   const [demoInput, setDemoInput] = useState("");
   const [demoStyle, setDemoStyle] = useState("");
@@ -40,12 +40,20 @@ export default function AgentManager() {
   const [demoVideoUrl, setDemoVideoUrl] = useState("");
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
 
+  const [confirmDeleteAgent, setConfirmDeleteAgent] = useState<string | null>(null);
+
   const loadData = async () => {
     setLoading(true);
     const [a, d, m] = await Promise.all([getAgents(), getDepartments(), getMembers()]);
     setAgents(a);
     setDepartments(d);
-    setMembers(m);
+    // Only keep members that belong to an existing department
+    const deptIds = new Set<string>();
+    const collectIds = (depts: Department[]) => {
+      for (const dept of depts) { deptIds.add(dept.id); if (dept.children) collectIds(dept.children); }
+    };
+    collectIds(d);
+    setMembers(m.filter((member) => deptIds.has(member.departmentId)));
     setKnowledgeBases(getKnowledgeBases());
     setLoading(false);
   };
@@ -83,6 +91,7 @@ export default function AgentManager() {
   const handleDeleteAgent = async (agentId: string) => {
     await deleteAgent(agentId);
     if (selectedAgentId === agentId) setSelectedAgentId(null);
+    setConfirmDeleteAgent(null);
     await loadData();
   };
 
@@ -120,11 +129,11 @@ export default function AgentManager() {
       }
 
       if (selectedAgent.type === "video-generator") {
-        // 真正生成视频
-        setDemoProgress("正在调用视频生成API...");
+        // Generate video
+        setDemoProgress("Calling video generation API...");
         const videoUrl = await generateVideo(demoInput, (status) => setDemoProgress(status));
         setDemoVideoUrl(videoUrl);
-        setDemoResult("✅ 视频生成完成！");
+        setDemoResult("✅ Video generation complete!");
       } else if (selectedAgent.type === "storyboard-generator") {
         const result = await generateStoryboard(demoInput, kbContext, demoStyle);
         setDemoResult(result);
@@ -133,7 +142,7 @@ export default function AgentManager() {
         setDemoResult(result);
       }
     } catch (err: unknown) {
-      setDemoError(err instanceof Error ? err.message : "执行失败");
+      setDemoError(err instanceof Error ? err.message : "Execution failed");
     } finally {
       setDemoRunning(false);
       setDemoProgress("");
@@ -142,8 +151,8 @@ export default function AgentManager() {
 
   const getAgentTypeLabel = (type: Agent["type"]) => {
     const labels: Record<Agent["type"], string> = {
-      "weibo-publisher": "微博发布", "video-generator": "视频生成",
-      "storyboard-generator": "分镜头脚本", "content-writer": "内容写作", custom: "自定义",
+      "weibo-publisher": "Weibo Publisher", "video-generator": "Video Generator",
+      "storyboard-generator": "Storyboard", "content-writer": "Content Writer", custom: "Custom",
     };
     return labels[type];
   };
@@ -154,18 +163,18 @@ export default function AgentManager() {
     return "#ff4444";
   };
 
-  if (loading) return <div className="empty-state">加载中...</div>;
+  if (loading) return <div className="empty-state">Loading...</div>;
 
   return (
     <div className="agent-container">
       <div className="agent-header">
-        <h2>Agent 管理</h2>
-        <button className="btn-primary" onClick={() => setShowAddAgent(true)}>+ 创建 Agent</button>
+        <h2>Agent Management</h2>
+        <button className="btn-primary" onClick={() => setShowAddAgent(true)}>+ Create Agent</button>
       </div>
 
       <div className="agent-content">
         <div className="agent-list">
-          <div className="panel-title">Agent 列表</div>
+          <div className="panel-title">Agent List</div>
           {(() => {
             const visibility = currentUser ? getVisibleAgentIds(currentUser.email, members) : "all";
             const visibleAgents = visibility === "all" ? agents : agents.filter((a) => visibility.has(a.id));
@@ -178,12 +187,12 @@ export default function AgentManager() {
               </div>
               <div className="agent-card-meta">
                 <span className="agent-type-badge">{getAgentTypeLabel(agent.type)}</span>
-                <span className="agent-assign-count">{agent.assignedTo.length} 个分配</span>
+                <span className="agent-assign-count">{agent.assignedTo.length} assignments</span>
               </div>
             </div>
           ));
           })()}
-          {agents.length === 0 && <div className="empty-state">暂无 Agent，点击上方按钮创建</div>}
+          {agents.length === 0 && <div className="empty-state">No Agents yet. Click above to create one.</div>}
         </div>
 
         <div className="agent-detail">
@@ -192,83 +201,83 @@ export default function AgentManager() {
               <div className="agent-detail-header">
                 <h3>{selectedAgent.name}</h3>
                 <div className="agent-detail-actions">
-                  <button className="btn-secondary" onClick={() => setShowAssign(true)}>关联组织</button>
+                  <button className="btn-secondary" onClick={() => setShowAssign(true)}>Link to Org</button>
                   <button className="btn-secondary" onClick={() => setShowDemo(!showDemo)}>
-                    {showDemo ? "收起演示" : "⚡ 试用"}
+                    {showDemo ? "Hide Demo" : "⚡ Try It"}
                   </button>
-                  <button className="btn-danger" onClick={() => handleDeleteAgent(selectedAgent.id)}>删除</button>
+                  <button className="btn-danger" onClick={() => setConfirmDeleteAgent(selectedAgent.id)}>Delete</button>
                 </div>
               </div>
 
               <div className="agent-detail-section">
-                <div className="detail-label">描述</div>
+                <div className="detail-label">Description</div>
                 <div className="detail-value">{selectedAgent.description}</div>
               </div>
               <div className="agent-detail-section">
-                <div className="detail-label">类型</div>
+                <div className="detail-label">Type</div>
                 <div className="detail-value">{getAgentTypeLabel(selectedAgent.type)}</div>
               </div>
               <div className="agent-detail-section">
-                <div className="detail-label">能力</div>
+                <div className="detail-label">Capabilities</div>
                 <div className="capability-tags">
                   {selectedAgent.capabilities.map((cap) => (<span key={cap} className="capability-tag">{cap}</span>))}
                 </div>
               </div>
               <div className="agent-detail-section">
-                <div className="detail-label">关联组织架构</div>
+                <div className="detail-label">Organization Links</div>
                 <div className="assignment-list">
                   {selectedAgent.assignedTo.map((assign) => (
                     <div key={assign.targetId} className="assignment-item">
                       <span className="assignment-icon">{assign.targetType === "department" ? "🏢" : "👤"}</span>
                       <span className="assignment-name">{assign.targetName}</span>
-                      <span className="assignment-type">{assign.targetType === "department" ? "部门" : "个人"}</span>
+                      <span className="assignment-type">{assign.targetType === "department" ? "Department" : "Individual"}</span>
                       <button className="assignment-remove" onClick={() => handleRemoveAssignment(selectedAgent.id, assign.targetId)}>×</button>
                     </div>
                   ))}
-                  {selectedAgent.assignedTo.length === 0 && <div className="empty-state">未关联任何组织，点击"关联组织"按钮添加</div>}
+                  {selectedAgent.assignedTo.length === 0 && <div className="empty-state">Not linked to any org. Click "Link to Org" to add.</div>}
                 </div>
               </div>
 
               {showDemo && (
                 <div className="agent-demo-section">
-                  <div className="detail-label">⚡ 工作流演示</div>
+                  <div className="detail-label">⚡ Workflow Demo</div>
                   {demoError && <div className="error-banner">{demoError}</div>}
                   <div className="form-group">
-                    <label>{selectedAgent.type === "video-generator" ? "视频描述（将直接生成视频）" : "产品/主题描述"}</label>
+                    <label>{selectedAgent.type === "video-generator" ? "Video description (will generate video)" : "Product/topic description"}</label>
                     <textarea value={demoInput} onChange={(e) => setDemoInput(e.target.value)}
-                      placeholder={selectedAgent.type === "video-generator" ? "描述你要生成的视频画面，例如：一个科技感的蓝色粒子汇聚成AI平台Logo..." : "描述产品或主题..."} rows={4} />
+                      placeholder={selectedAgent.type === "video-generator" ? "Describe the video scene you want to generate..." : "Describe the product or topic..."} rows={4} />
                   </div>
                   {selectedAgent.type !== "video-generator" && (
                     <>
                       <div className="form-group">
-                        <label>知识库（可选）</label>
+                        <label>Knowledge Base (optional)</label>
                         <select value={demoKBId} onChange={(e) => setDemoKBId(e.target.value)}>
-                          <option value="">不使用</option>
+                          <option value="">None</option>
                           {knowledgeBases.map((kb) => (<option key={kb.id} value={kb.id}>{kb.name}</option>))}
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>风格（可选）</label>
-                        <input value={demoStyle} onChange={(e) => setDemoStyle(e.target.value)} placeholder="科技感、简洁..." />
+                        <label>Style (optional)</label>
+                        <input value={demoStyle} onChange={(e) => setDemoStyle(e.target.value)} placeholder="Tech, minimalist..." />
                       </div>
                     </>
                   )}
                   <button className="btn-primary" onClick={handleRunDemo} disabled={demoRunning}>
-                    {demoRunning ? "⏳ 执行中..." : selectedAgent.type === "video-generator" ? "🎬 生成视频" : "▶ 执行工作流"}
+                    {demoRunning ? "⏳ Running..." : selectedAgent.type === "video-generator" ? "🎬 Generate Video" : "▶ Run Workflow"}
                   </button>
                   {demoProgress && <div className="demo-progress">⏳ {demoProgress}</div>}
                   {demoVideoUrl && (
                     <div className="video-result" style={{ marginTop: 16 }}>
-                      <div className="result-header">🎬 生成的视频</div>
+                      <div className="result-header">🎬 Generated Video</div>
                       <video controls src={demoVideoUrl} style={{ width: "100%", maxHeight: 400, marginTop: 8, borderRadius: 4 }} />
                       <a href={demoVideoUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ marginTop: 8, display: "inline-block" }}>
-                        下载视频
+                        Download Video
                       </a>
                     </div>
                   )}
                   {demoResult && !demoVideoUrl && (
                     <div className="workflow-result" style={{ marginTop: 16 }}>
-                      <div className="result-header">执行结果</div>
+                      <div className="result-header">Execution Result</div>
                       <pre className="result-content">{demoResult}</pre>
                     </div>
                   )}
@@ -276,7 +285,7 @@ export default function AgentManager() {
               )}
             </>
           ) : (
-            <div className="empty-state">← 选择一个 Agent 查看详情</div>
+            <div className="empty-state">← Select an Agent to view details</div>
           )}
         </div>
       </div>
@@ -284,22 +293,22 @@ export default function AgentManager() {
       {showAddAgent && (
         <div className="modal-overlay" onClick={() => setShowAddAgent(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>创建 Agent</h3>
-            <div className="form-group"><label>名称</label><input value={newAgentForm.name} onChange={(e) => setNewAgentForm({ ...newAgentForm, name: e.target.value })} placeholder="Agent 名称" /></div>
-            <div className="form-group"><label>描述</label><input value={newAgentForm.description} onChange={(e) => setNewAgentForm({ ...newAgentForm, description: e.target.value })} placeholder="Agent 描述" /></div>
-            <div className="form-group"><label>类型</label>
+            <h3>Create Agent</h3>
+            <div className="form-group"><label>Name</label><input value={newAgentForm.name} onChange={(e) => setNewAgentForm({ ...newAgentForm, name: e.target.value })} placeholder="Agent name" /></div>
+            <div className="form-group"><label>Description</label><input value={newAgentForm.description} onChange={(e) => setNewAgentForm({ ...newAgentForm, description: e.target.value })} placeholder="Agent description" /></div>
+            <div className="form-group"><label>Type</label>
               <select value={newAgentForm.type} onChange={(e) => setNewAgentForm({ ...newAgentForm, type: e.target.value as Agent["type"] })}>
-                <option value="storyboard-generator">分镜头脚本生成</option>
-                <option value="video-generator">视频生成</option>
-                <option value="weibo-publisher">微博发布</option>
-                <option value="content-writer">内容写作</option>
-                <option value="custom">自定义</option>
+                <option value="storyboard-generator">Storyboard Generator</option>
+                <option value="video-generator">Video Generator</option>
+                <option value="weibo-publisher">Weibo Publisher</option>
+                <option value="content-writer">Content Writer</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
-            <div className="form-group"><label>能力（逗号分隔）</label><input value={newAgentForm.capabilities} onChange={(e) => setNewAgentForm({ ...newAgentForm, capabilities: e.target.value })} placeholder="知识库检索, 内容生成, ..." /></div>
+            <div className="form-group"><label>Capabilities (comma-separated)</label><input value={newAgentForm.capabilities} onChange={(e) => setNewAgentForm({ ...newAgentForm, capabilities: e.target.value })} placeholder="Knowledge retrieval, content generation, ..." /></div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowAddAgent(false)}>取消</button>
-              <button className="btn-primary" onClick={handleAddAgent}>创建</button>
+              <button className="btn-secondary" onClick={() => setShowAddAgent(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleAddAgent}>Create</button>
             </div>
           </div>
         </div>
@@ -308,24 +317,37 @@ export default function AgentManager() {
       {showAssign && (
         <div className="modal-overlay" onClick={() => setShowAssign(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>关联到组织架构</h3>
-            <div className="form-group"><label>关联类型</label>
+            <h3>Link to Organization</h3>
+            <div className="form-group"><label>Link Type</label>
               <select value={assignType} onChange={(e) => { setAssignType(e.target.value as "member" | "department"); setAssignTargetId(""); }}>
-                <option value="department">部门</option>
-                <option value="member">个人</option>
+                <option value="department">Department</option>
+                <option value="member">Individual</option>
               </select>
             </div>
-            <div className="form-group"><label>{assignType === "department" ? "选择部门" : "选择成员"}</label>
+            <div className="form-group"><label>{assignType === "department" ? "Select Department" : "Select Member"}</label>
               <select value={assignTargetId} onChange={(e) => setAssignTargetId(e.target.value)}>
-                <option value="">请选择</option>
+                <option value="">Please select</option>
                 {assignType === "department"
                   ? allDeptsFlatList().map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))
                   : members.map((m) => (<option key={m.id} value={m.id}>{m.name} ({m.role})</option>))}
               </select>
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowAssign(false)}>取消</button>
-              <button className="btn-primary" onClick={handleAssign}>确认关联</button>
+              <button className="btn-secondary" onClick={() => setShowAssign(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleAssign}>Confirm Link</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteAgent && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteAgent(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete this Agent? This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setConfirmDeleteAgent(null)}>Cancel</button>
+              <button className="btn-danger" onClick={() => handleDeleteAgent(confirmDeleteAgent)}>Confirm Delete</button>
             </div>
           </div>
         </div>

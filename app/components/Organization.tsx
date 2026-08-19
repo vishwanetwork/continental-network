@@ -90,18 +90,18 @@ export default function Organization() {
   const handleAddMember = async () => {
     if (!newMemberName.trim() || !selectedDeptId) return;
     if (!newMemberEmail.trim()) {
-      setEmailError("邮箱为必填项");
+      setEmailError("Email is required");
       return;
     }
     if (!isValidEmail(newMemberEmail.trim())) {
-      setEmailError("请输入有效的邮箱格式");
+      setEmailError("Please enter a valid email format");
       return;
     }
     setEmailError("");
     await addMember({
       id: `m-${Date.now()}`,
       name: newMemberName.trim(),
-      role: newMemberRole.trim() || "成员",
+      role: newMemberRole.trim() || "Member",
       departmentId: selectedDeptId,
       email: newMemberEmail.trim(),
     });
@@ -121,20 +121,20 @@ export default function Organization() {
   const handleEditMember = async () => {
     if (!editingMember || !editMemberName.trim()) return;
     if (!editMemberEmail.trim()) {
-      setEditEmailError("邮箱为必填项");
+      setEditEmailError("Email is required");
       return;
     }
     if (!isValidEmail(editMemberEmail.trim())) {
-      setEditEmailError("请输入有效的邮箱格式");
+      setEditEmailError("Please enter a valid email format");
       return;
     }
     setEditEmailError("");
-    // 删除旧的再创建新的（因为没有 updateMember API）
+    // Delete old and create new (no updateMember API)
     await deleteMember(editingMember.id);
     await addMember({
       id: editingMember.id,
       name: editMemberName.trim(),
-      role: editMemberRole.trim() || "成员",
+      role: editMemberRole.trim() || "Member",
       departmentId: editingMember.departmentId,
       email: editMemberEmail.trim(),
     });
@@ -174,11 +174,11 @@ export default function Organization() {
               {dept.name}
             </span>
           )}
-          <span className="dept-count">{getMembersForDept(dept.id).length}人</span>
+          <span className="dept-count">{getMembersForDept(dept.id).length} members</span>
           <button
             className="dept-delete-btn"
             onClick={(e) => { e.stopPropagation(); setConfirmDeleteDept(dept.id); }}
-            title="删除部门"
+            title="Delete department"
           >
             ×
           </button>
@@ -191,20 +191,20 @@ export default function Organization() {
   const selectedDept = allDeptsFlatList().find((d) => d.id === selectedDeptId);
   const selectedMembers = selectedDeptId ? getMembersForDept(selectedDeptId) : [];
 
-  if (loading) return <div className="empty-state">加载中...</div>;
+  if (loading) return <div className="empty-state">Loading...</div>;
 
   return (
     <div className="org-container">
       <div className="org-header">
-        <h2>组织架构管理</h2>
-        <button className="btn-primary" onClick={() => setShowAddDept(true)}>+ 添加部门</button>
+        <h2>Organization Management</h2>
+        <button className="btn-primary" onClick={() => setShowAddDept(true)}>+ Add Department</button>
       </div>
 
       <div className="org-content">
         <div className="org-tree">
-          <div className="panel-title">部门结构</div>
+          <div className="panel-title">Department Structure</div>
           {departments.length === 0 ? (
-            <div className="empty-state">暂无部门，点击上方按钮创建</div>
+            <div className="empty-state">No departments yet. Click above to create one.</div>
           ) : (
             renderDeptTree(departments)
           )}
@@ -218,8 +218,8 @@ export default function Organization() {
                 {selectedDept.description && <span className="dept-description"> — {selectedDept.description}</span>}
               </div>
               <div className="member-header">
-                <span>成员列表 ({selectedMembers.length})</span>
-                <button className="btn-secondary" onClick={() => setShowAddMember(true)}>+ 添加成员</button>
+                <span>Members ({selectedMembers.length})</span>
+                <button className="btn-secondary" onClick={() => setShowAddMember(true)}>+ Add Member</button>
               </div>
               <div className="member-list">
                 {selectedMembers.map((member) => (
@@ -230,15 +230,15 @@ export default function Organization() {
                       <div className="member-role">{member.role}</div>
                       {member.email && <div className="member-email">{member.email}</div>}
                     </div>
-                    <button className="member-edit-btn" onClick={() => { setEditingMember(member); setEditMemberName(member.name); setEditMemberRole(member.role); setEditMemberEmail(member.email || ""); setEditEmailError(""); }} title="编辑">✎</button>
-                    <button className="member-delete-btn" onClick={() => setConfirmDeleteMember(member.id)} title="删除">×</button>
+                    <button className="member-edit-btn" onClick={() => { setEditingMember(member); setEditMemberName(member.name); setEditMemberRole(member.role); setEditMemberEmail(member.email || ""); setEditEmailError(""); }} title="Edit">✎</button>
+                    <button className="member-delete-btn" onClick={() => setConfirmDeleteMember(member.id)} title="Delete">×</button>
                   </div>
                 ))}
-                {selectedMembers.length === 0 && <div className="empty-state">暂无成员，点击上方按钮添加</div>}
+                {selectedMembers.length === 0 && <div className="empty-state">No members yet. Click above to add one.</div>}
               </div>
             </>
           ) : (
-            <div className="empty-state">← 选择一个部门查看详情</div>
+            <div className="empty-state">← Select a department to view details</div>
           )}
         </div>
       </div>
@@ -246,25 +246,25 @@ export default function Organization() {
       {showAddDept && (
         <div className="modal-overlay" onClick={() => setShowAddDept(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>添加部门</h3>
+            <h3>Add Department</h3>
             <div className="form-group">
-              <label>部门名称</label>
-              <input value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} placeholder="输入部门名称" />
+              <label>Department Name</label>
+              <input value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} placeholder="Enter department name" />
             </div>
             <div className="form-group">
-              <label>描述</label>
-              <input value={newDeptDesc} onChange={(e) => setNewDeptDesc(e.target.value)} placeholder="可选描述" />
+              <label>Description</label>
+              <input value={newDeptDesc} onChange={(e) => setNewDeptDesc(e.target.value)} placeholder="Optional description" />
             </div>
             <div className="form-group">
-              <label>上级部门</label>
+              <label>Parent Department</label>
               <select value={newDeptParent || ""} onChange={(e) => setNewDeptParent(e.target.value || null)}>
-                <option value="">无（顶级部门）</option>
+                <option value="">None (top-level)</option>
                 {allDeptsFlatList().map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
               </select>
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowAddDept(false)}>取消</button>
-              <button className="btn-primary" onClick={handleAddDept}>确认添加</button>
+              <button className="btn-secondary" onClick={() => setShowAddDept(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleAddDept}>Confirm</button>
             </div>
           </div>
         </div>
@@ -273,23 +273,23 @@ export default function Organization() {
       {showAddMember && (
         <div className="modal-overlay" onClick={() => setShowAddMember(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>添加成员到 {selectedDept?.name}</h3>
+            <h3>Add Member to {selectedDept?.name}</h3>
             <div className="form-group">
-              <label>姓名</label>
-              <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="输入姓名" />
+              <label>Name</label>
+              <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Enter name" />
             </div>
             <div className="form-group">
-              <label>角色</label>
-              <input value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)} placeholder="输入角色/职位" />
+              <label>Role</label>
+              <input value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value)} placeholder="Enter role/position" />
             </div>
             <div className="form-group">
-              <label>Google 邮箱（必填）</label>
+              <label>Google Email (required)</label>
               <input value={newMemberEmail} onChange={(e) => { setNewMemberEmail(e.target.value); setEmailError(""); }} placeholder="example@gmail.com" type="email" />
               {emailError && <span className="form-error">{emailError}</span>}
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => { setShowAddMember(false); setEmailError(""); }}>取消</button>
-              <button className="btn-primary" onClick={handleAddMember}>确认添加</button>
+              <button className="btn-secondary" onClick={() => { setShowAddMember(false); setEmailError(""); }}>Cancel</button>
+              <button className="btn-primary" onClick={handleAddMember}>Confirm</button>
             </div>
           </div>
         </div>
@@ -298,23 +298,23 @@ export default function Organization() {
       {editingMember && (
         <div className="modal-overlay" onClick={() => setEditingMember(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>编辑成员</h3>
+            <h3>Edit Member</h3>
             <div className="form-group">
-              <label>姓名</label>
-              <input value={editMemberName} onChange={(e) => setEditMemberName(e.target.value)} placeholder="输入姓名" />
+              <label>Name</label>
+              <input value={editMemberName} onChange={(e) => setEditMemberName(e.target.value)} placeholder="Enter name" />
             </div>
             <div className="form-group">
-              <label>角色</label>
-              <input value={editMemberRole} onChange={(e) => setEditMemberRole(e.target.value)} placeholder="输入角色/职位" />
+              <label>Role</label>
+              <input value={editMemberRole} onChange={(e) => setEditMemberRole(e.target.value)} placeholder="Enter role/position" />
             </div>
             <div className="form-group">
-              <label>Google 邮箱（必填）</label>
+              <label>Google Email (required)</label>
               <input value={editMemberEmail} onChange={(e) => { setEditMemberEmail(e.target.value); setEditEmailError(""); }} placeholder="example@gmail.com" type="email" />
               {editEmailError && <span className="form-error">{editEmailError}</span>}
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setEditingMember(null)}>取消</button>
-              <button className="btn-primary" onClick={handleEditMember}>保存修改</button>
+              <button className="btn-secondary" onClick={() => setEditingMember(null)}>Cancel</button>
+              <button className="btn-primary" onClick={handleEditMember}>Save Changes</button>
             </div>
           </div>
         </div>
@@ -323,11 +323,11 @@ export default function Organization() {
       {confirmDeleteMember && (
         <div className="modal-overlay" onClick={() => setConfirmDeleteMember(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>确认删除</h3>
-            <p>确定要删除该成员吗？此操作不可撤销。</p>
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete this member? This action cannot be undone.</p>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setConfirmDeleteMember(null)}>取消</button>
-              <button className="btn-danger" onClick={() => handleDeleteMember(confirmDeleteMember)}>确认删除</button>
+              <button className="btn-secondary" onClick={() => setConfirmDeleteMember(null)}>Cancel</button>
+              <button className="btn-danger" onClick={() => handleDeleteMember(confirmDeleteMember)}>Confirm Delete</button>
             </div>
           </div>
         </div>
@@ -336,11 +336,11 @@ export default function Organization() {
       {confirmDeleteDept && (
         <div className="modal-overlay" onClick={() => setConfirmDeleteDept(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>确认删除部门</h3>
-            <p>确定要删除该部门吗？部门下的所有成员和子部门也会被删除，此操作不可撤销。</p>
+            <h3>Confirm Delete Department</h3>
+            <p>Are you sure you want to delete this department? All members and sub-departments will also be deleted. This action cannot be undone.</p>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setConfirmDeleteDept(null)}>取消</button>
-              <button className="btn-danger" onClick={() => handleDeleteDept(confirmDeleteDept)}>确认删除</button>
+              <button className="btn-secondary" onClick={() => setConfirmDeleteDept(null)}>Cancel</button>
+              <button className="btn-danger" onClick={() => handleDeleteDept(confirmDeleteDept)}>Confirm Delete</button>
             </div>
           </div>
         </div>

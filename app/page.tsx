@@ -199,8 +199,8 @@ type RoomDefinition = {
 };
 
 const navItems: Array<{ code: string; label: string; view: View }> = [
-  { code: "01", label: "组织架构", view: "organization" },
-  { code: "02", label: "AGENT管理", view: "agents" },
+  { code: "01", label: "ORGANIZATION", view: "organization" },
+  { code: "02", label: "AGENTS", view: "agents" },
   { code: "03", label: "COMMAND", view: "intake" },
   { code: "04", label: "WORKFLOWS", view: "workflow" },
   { code: "05", label: "CONTRACTORS", view: "contractors" },
@@ -2294,7 +2294,7 @@ function HomeContent() {
           FOR DEVELOPERS
         </button>
         <button className="identity-button" type="button" onClick={async () => { const { logout } = await import("./lib/auth"); await logout(); window.location.reload(); }}>
-          {currentUser.name || currentUser.email} <span className="identity-role">退出</span>
+          {currentUser.name || currentUser.email} <span className="identity-role">LOGOUT</span>
         </button>
       </header>
 

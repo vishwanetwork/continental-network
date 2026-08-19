@@ -1,4 +1,4 @@
-// 认证相关 API 封装
+// Authentication API utilities
 export interface User {
   id: string;
   email: string;
