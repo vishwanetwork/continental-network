@@ -242,6 +242,10 @@ h3 {
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
+  margin: 0;
+  width: 100%;
+  border-left: 1px solid var(--line);
+  font-size: 12px;
 }
 
 .form-group input:focus,

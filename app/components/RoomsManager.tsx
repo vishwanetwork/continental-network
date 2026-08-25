@@ -1,111 +1,193 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Agent, Department, Member } from "../types";
 import { getAgents, getDepartments, getMembers } from "../store";
+import { useCurrentUser } from "./AuthGuard";
+
+interface DropdownOption {
+  id: string;
+  label: string;
+  sub?: string;
+}
+
+function MultiSelectDropdown({
+  options,
+  selected,
+  onToggle,
+  placeholder = "Select...",
+}: {
+  options: DropdownOption[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedLabels = options.filter((o) => selected.has(o.id)).map((o) => o.label);
+
+  return (
+    <div className="multi-select-dropdown" ref={ref}>
+      <button type="button" className="multi-select-trigger" onClick={() => setOpen(!open)}>
+        <span className="multi-select-text">
+          {selectedLabels.length > 0 ? selectedLabels.join(", ") : placeholder}
+        </span>
+        <span className="multi-select-arrow">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="multi-select-menu">
+          {options.length === 0 && <div className="multi-select-empty">No options available</div>}
+          {options.map((opt) => (
+            <label key={opt.id} className={`multi-select-option ${selected.has(opt.id) ? "checked" : ""}`}>
+              <input
+                type="checkbox"
+                checked={selected.has(opt.id)}
+                onChange={() => onToggle(opt.id)}
+              />
+              <span className="multi-select-option-label">{opt.label}</span>
+              {opt.sub && <small className="multi-select-option-sub">{opt.sub}</small>}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface WorkflowItem {
+  id: string;
+  name: string;
+  stepCount: number;
+}
 
 export interface Room {
   id: string;
   name: string;
+  ownerId: string;
+  ownerEmail: string;
   memberIds: string[];
   agentIds: string[];
+  workflowIds: string[];
 }
 
 export function loadRooms(): Room[] {
   if (typeof window === "undefined") return [];
   try {
-    const s = localStorage.getItem("continental_rooms_v2");
+    const s = localStorage.getItem("continental_rooms_v3");
     return s ? JSON.parse(s) : [];
   } catch { return []; }
 }
 
 function saveRooms(rooms: Room[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("continental_rooms_v2", JSON.stringify(rooms));
+  localStorage.setItem("continental_rooms_v3", JSON.stringify(rooms));
 }
 
-// Get visible agent IDs based on user email
 export function getVisibleAgentIds(userEmail: string, members: Member[]): Set<string> | "all" {
+  return "all";
+}
+
+export function getVisibleWorkflowIds(userId: string): Set<string> | "all" {
   const rooms = loadRooms();
-  if (rooms.length === 0) return "all";
-
-  const currentMember = members.find((m) => m.email === userEmail);
-  if (!currentMember) return "all";
-
   const visibleIds = new Set<string>();
   for (const room of rooms) {
-    if (room.memberIds.includes(currentMember.id)) {
-      for (const agentId of room.agentIds) {
-        visibleIds.add(agentId);
-      }
+    if (room.memberIds.includes(userId)) {
+      for (const wfId of (room.workflowIds || [])) visibleIds.add(wfId);
     }
   }
   return visibleIds;
 }
 
+export function getVisibleAgentIdsByUserId(userId: string): Set<string> | "all" {
+  return "all";
+}
+
 export default function RoomsManager() {
+  const currentUser = useCurrentUser();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
-  const [newRoomName, setNewRoomName] = useState("");
+  const [showEditRoom, setShowEditRoom] = useState(false);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Create/Edit form state
+  const [formName, setFormName] = useState("");
+  const [formMembers, setFormMembers] = useState<Set<string>>(new Set());
+  const [formAgents, setFormAgents] = useState<Set<string>>(new Set());
+  const [formWorkflows, setFormWorkflows] = useState<Set<string>>(new Set());
+
   const loadData = async () => {
-    const [a, d, m] = await Promise.all([getAgents(), getDepartments(), getMembers()]);
+    const [a] = await Promise.all([getAgents(), getDepartments()]);
     setAgents(a);
-    setDepartments(d);
-    // Only keep members that belong to an existing department
-    const deptIds = new Set<string>();
-    const collectDeptIds = (depts: Department[]) => {
-      for (const dept of depts) {
-        deptIds.add(dept.id);
-        if (dept.children) collectDeptIds(dept.children);
+    // Load all users for member selection
+    try {
+      const usersRes = await fetch("/api/users");
+      if (usersRes.ok) {
+        const users = await usersRes.json();
+        setMembers(users.map((u: { id: string; email: string; name: string }) => ({
+          id: u.id,
+          name: u.name || u.email.split("@")[0],
+          email: u.email,
+          role: "",
+          departmentId: "",
+        })));
       }
-    };
-    collectDeptIds(d);
-    const validMembers = m.filter((member) => deptIds.has(member.departmentId));
-    setMembers(validMembers);
-    // Clean up stale member/agent IDs from rooms that no longer exist
-    const memberIdSet = new Set(validMembers.map((member) => member.id));
-    const agentIdSet = new Set(a.map((agent) => agent.id));
-    const currentRooms = loadRooms();
-    let dirty = false;
-    const cleanedRooms = currentRooms.map((room) => {
-      const cleanMembers = room.memberIds.filter((id) => memberIdSet.has(id));
-      const cleanAgents = room.agentIds.filter((id) => agentIdSet.has(id));
-      if (cleanMembers.length !== room.memberIds.length || cleanAgents.length !== room.agentIds.length) {
-        dirty = true;
-        return { ...room, memberIds: cleanMembers, agentIds: cleanAgents };
-      }
-      return room;
-    });
-    if (dirty) saveRooms(cleanedRooms);
-    setRooms(cleanedRooms);
+    } catch { /* ignore */ }
+    try {
+      const wfRes = await fetch("/api/workflows");
+      if (wfRes.ok) setWorkflows(await wfRes.json());
+    } catch { /* ignore */ }
+    setRooms(loadRooms());
     setLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
+  const isOwner = (room: Room) => currentUser?.email === room.ownerEmail;
 
   const handleCreateRoom = () => {
-    if (!newRoomName.trim()) return;
+    if (!formName.trim() || !currentUser) return;
     const room: Room = {
       id: `room-${Date.now()}`,
-      name: newRoomName.trim(),
-      memberIds: [],
-      agentIds: [],
+      name: formName.trim(),
+      ownerId: currentUser.id,
+      ownerEmail: currentUser.email,
+      memberIds: Array.from(formMembers),
+      agentIds: Array.from(formAgents),
+      workflowIds: Array.from(formWorkflows),
     };
     const updated = [...rooms, room];
     setRooms(updated);
     saveRooms(updated);
     setSelectedRoomId(room.id);
-    setNewRoomName("");
+    resetForm();
     setShowCreateRoom(false);
+  };
+
+  const handleEditRoom = () => {
+    if (!selectedRoom || !formName.trim()) return;
+    const updated = rooms.map((r) => {
+      if (r.id !== selectedRoom.id) return r;
+      return { ...r, name: formName.trim(), memberIds: Array.from(formMembers), agentIds: Array.from(formAgents), workflowIds: Array.from(formWorkflows) };
+    });
+    setRooms(updated);
+    saveRooms(updated);
+    setShowEditRoom(false);
+    resetForm();
   };
 
   const handleDeleteRoom = (roomId: string) => {
@@ -116,35 +198,90 @@ export default function RoomsManager() {
     setConfirmDeleteRoom(null);
   };
 
-  const toggleMember = (memberId: string) => {
+  const openEditModal = () => {
     if (!selectedRoom) return;
-    const updated = rooms.map((r) => {
-      if (r.id !== selectedRoom.id) return r;
-      const has = r.memberIds.includes(memberId);
-      return { ...r, memberIds: has ? r.memberIds.filter((id) => id !== memberId) : [...r.memberIds, memberId] };
-    });
-    setRooms(updated);
-    saveRooms(updated);
+    setFormName(selectedRoom.name);
+    setFormMembers(new Set(selectedRoom.memberIds));
+    setFormAgents(new Set(selectedRoom.agentIds));
+    setFormWorkflows(new Set(selectedRoom.workflowIds || []));
+    setShowEditRoom(true);
   };
 
-  const toggleAgent = (agentId: string) => {
-    if (!selectedRoom) return;
-    const updated = rooms.map((r) => {
-      if (r.id !== selectedRoom.id) return r;
-      const has = r.agentIds.includes(agentId);
-      return { ...r, agentIds: has ? r.agentIds.filter((id) => id !== agentId) : [...r.agentIds, agentId] };
+  const resetForm = () => {
+    setFormName("");
+    setFormMembers(new Set());
+    setFormAgents(new Set());
+    setFormWorkflows(new Set());
+  };
+
+  const toggleFormMember = (id: string) => {
+    setFormMembers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
     });
-    setRooms(updated);
-    saveRooms(updated);
+  };
+
+  const toggleFormAgent = (id: string) => {
+    setFormAgents((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleFormWorkflow = (id: string) => {
+    setFormWorkflows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   if (loading) return <div className="loading-overlay"><div className="loading-spinner" /></div>;
+
+  const renderRoomModal = (title: string, onSubmit: () => void, onCancel: () => void, submitLabel: string) => (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+        <h3>{title}</h3>
+        <div className="form-group">
+          <label>Room Name</label>
+          <input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Marketing workspace" />
+        </div>
+
+        <div className="form-group">
+          <label>Members</label>
+          <MultiSelectDropdown
+            options={members.map((m) => ({ id: m.id, label: m.name, sub: m.email || m.role }))}
+            selected={formMembers}
+            onToggle={toggleFormMember}
+            placeholder="Select members..."
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Workflows</label>
+          <MultiSelectDropdown
+            options={workflows.map((wf) => ({ id: wf.id, label: wf.name, sub: `${wf.stepCount} steps` }))}
+            selected={formWorkflows}
+            onToggle={toggleFormWorkflow}
+            placeholder="Select workflows..."
+          />
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary" onClick={onSubmit} disabled={!formName.trim()}>{submitLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="rooms-container">
       <div className="rooms-header">
         <h2>Rooms</h2>
-        <button className="btn-primary" onClick={() => setShowCreateRoom(true)}>+ Create Room</button>
+        <button className="btn-primary" onClick={() => { resetForm(); setShowCreateRoom(true); }}>+ Create Room</button>
       </div>
 
       <div className="rooms-content">
@@ -159,9 +296,9 @@ export default function RoomsManager() {
             >
               <div className="room-card-name">{room.name}</div>
               <div className="room-card-meta">
-                {room.memberIds.length} Members · {room.agentIds.length} Agent
+                {room.memberIds.length} Members · {room.agentIds.length} Agents
+                {isOwner(room) && <span className="room-owner-badge">Owner</span>}
               </div>
-              <button className="dept-delete-btn" onClick={(e) => { e.stopPropagation(); setConfirmDeleteRoom(room.id); }}>×</button>
             </div>
           ))}
         </div>
@@ -169,65 +306,58 @@ export default function RoomsManager() {
         <div className="rooms-detail">
           {selectedRoom ? (
             <div className="room-config">
-              <h3>{selectedRoom.name}</h3>
+              <div className="room-detail-header">
+                <h3>{selectedRoom.name}</h3>
+                {isOwner(selectedRoom) && (
+                  <div className="room-detail-actions">
+                    <button className="btn-secondary" onClick={openEditModal}>Edit</button>
+                    <button className="btn-danger" onClick={() => setConfirmDeleteRoom(selectedRoom.id)}>Delete</button>
+                  </div>
+                )}
+              </div>
+              <div className="room-owner-info">Owner: {selectedRoom.ownerEmail}</div>
 
               <div className="room-section">
-                <div className="panel-title">Members (check those who can access this Room)</div>
-                <div className="room-checklist">
-                  {members.length === 0 && <div className="empty-state">Please add members in the organization first</div>}
-                  {members.map((m) => (
-                    <label key={m.id} className="room-check-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedRoom.memberIds.includes(m.id)}
-                        onChange={() => toggleMember(m.id)}
-                      />
-                      <span>{m.name}</span>
-                      <span className="room-check-meta">{m.email || "No email"}</span>
-                    </label>
-                  ))}
+                <div className="panel-title">Workflows ({(selectedRoom.workflowIds || []).length})</div>
+                <div className="room-member-chips">
+                  {(selectedRoom.workflowIds || []).map((wid) => {
+                    const wf = workflows.find((x) => x.id === wid);
+                    return wf ? <span key={wid} className="room-chip">{wf.name}</span> : null;
+                  })}
+                  {(selectedRoom.workflowIds || []).length === 0 && <span className="empty-hint">No workflows assigned</span>}
                 </div>
               </div>
 
               <div className="room-section">
-                <div className="panel-title">Agents (check Agents available in this Room)</div>
-                <div className="room-checklist">
-                  {agents.length === 0 && <div className="empty-state">Please create an Agent first</div>}
-                  {agents.map((a) => (
-                    <label key={a.id} className="room-check-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedRoom.agentIds.includes(a.id)}
-                        onChange={() => toggleAgent(a.id)}
-                      />
-                      <span>{a.name}</span>
-                      <span className="room-check-meta">{a.type}</span>
-                    </label>
-                  ))}
+                <div className="panel-title">Members ({selectedRoom.memberIds.length})</div>
+                <div className="room-member-chips">
+                  {selectedRoom.memberIds.map((mid) => {
+                    const m = members.find((x) => x.id === mid);
+                    return m ? <span key={mid} className="room-chip">{m.name}</span> : null;
+                  })}
+                  {selectedRoom.memberIds.length === 0 && <span className="empty-hint">No members assigned</span>}
+                </div>
+              </div>
+
+              <div className="room-section">
+                <div className="panel-title">Agents ({selectedRoom.agentIds.length})</div>
+                <div className="room-member-chips">
+                  {selectedRoom.agentIds.map((aid) => {
+                    const a = agents.find((x) => x.id === aid);
+                    return a ? <span key={aid} className="room-chip">{a.name}</span> : null;
+                  })}
+                  {selectedRoom.agentIds.length === 0 && <span className="empty-hint">No agents assigned</span>}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="empty-state">← Select a Room to manage permissions</div>
+            <div className="empty-state">← Select a Room to view details</div>
           )}
         </div>
       </div>
 
-      {showCreateRoom && (
-        <div className="modal-overlay" onClick={() => setShowCreateRoom(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Create Room</h3>
-            <div className="form-group">
-              <label>Room Name</label>
-              <input value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="e.g. Marketing workspace" />
-            </div>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowCreateRoom(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleCreateRoom}>Create</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showCreateRoom && renderRoomModal("Create Room", handleCreateRoom, () => setShowCreateRoom(false), "Create")}
+      {showEditRoom && renderRoomModal("Edit Room", handleEditRoom, () => setShowEditRoom(false), "Save Changes")}
 
       {confirmDeleteRoom && (
         <div className="modal-overlay" onClick={() => setConfirmDeleteRoom(null)}>
