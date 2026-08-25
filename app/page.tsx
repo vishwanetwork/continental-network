@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import Organization from "./components/Organization";
-import AgentManager from "./components/AgentManager";
+import { useState, useEffect } from "react";
 import RoomsManager from "./components/RoomsManager";
 import AuthGuard, { useCurrentUser } from "./components/AuthGuard";
+import OrgOnboarding from "./components/OrgOnboarding";
+import Dashboard from "./components/Dashboard";
+import TaskCreate from "./components/TaskCreate";
+import TaskDetail from "./components/TaskDetail";
+import AgentBrowser from "./components/AgentBrowser";
+import WorkflowManager from "./components/WorkflowManager";
+import OrgManager from "./components/OrgManager";
 
 type View =
   | "intake"
@@ -20,7 +25,10 @@ type View =
   | "developer"
   | "organization"
   | "agents"
-  | "agent-workflows";
+  | "agent-workflows"
+  | "dashboard"
+  | "create-task"
+  | "task-detail";
 
 type QuoteMode = "BEST VALUE" | "HIGHEST SCORE" | "LOWEST COST" | "FASTEST";
 type Capability =
@@ -199,15 +207,16 @@ type RoomDefinition = {
 };
 
 const navItems: Array<{ code: string; label: string; view: View }> = [
-  { code: "01", label: "ORGANIZATION", view: "organization" },
-  { code: "02", label: "AGENTS", view: "agents" },
-  { code: "03", label: "COMMAND", view: "intake" },
-  { code: "04", label: "WORKFLOWS", view: "workflow" },
-  { code: "05", label: "CONTRACTORS", view: "contractors" },
-  { code: "06", label: "QUESTS", view: "quests" },
-  { code: "07", label: "ROOMS", view: "rooms" },
-  { code: "08", label: "LEDGER", view: "ledger" },
-  { code: "09", label: "DOCS", view: "docs" },
+  { code: "01", label: "DASHBOARD", view: "dashboard" },
+  { code: "02", label: "WORKFLOWS", view: "agents" },
+  { code: "03", label: "AGENTS", view: "organization" },
+  { code: "04", label: "TEAM", view: "agent-workflows" },
+  { code: "05", label: "COMMAND", view: "intake" },
+  { code: "06", label: "CONTRACTORS", view: "contractors" },
+  { code: "07", label: "QUESTS", view: "quests" },
+  { code: "08", label: "ROOMS", view: "rooms" },
+  { code: "09", label: "LEDGER", view: "ledger" },
+  { code: "10", label: "DOCS", view: "docs" },
 ];
 
 const initialNeedBriefFields: NeedBriefField[] = [
@@ -1640,7 +1649,21 @@ export default function Home() {
 
 function HomeContent() {
   const currentUser = useCurrentUser()!;
-  const [view, setView] = useState<View>("organization");
+  const [view, setView] = useState<View>("dashboard");
+  const [orgs, setOrgs] = useState<Array<{ id: string; name: string }>>([]);
+  const [orgLoading, setOrgLoading] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
+
+  useEffect(() => {
+    fetch("/api/organizations", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => { setOrgs(data); setOrgLoading(false); })
+      .catch(() => setOrgLoading(false));
+  }, []);
+
+  const currentOrg = orgs[0];
+
   const [request, setRequest] = useState(
     "We need a competitor intelligence workflow for our APAC fintech team.",
   );
@@ -2322,8 +2345,29 @@ function HomeContent() {
         </aside>
 
         <section className={`command-stage view-${view}`}>
-          {view === "organization" && <Organization />}
-          {view === "agents" && <AgentManager />}
+          {orgLoading && <div className="loading-overlay"><div className="loading-spinner" /></div>}
+          {!orgLoading && orgs.length === 0 && view === "dashboard" && (
+            <OrgOnboarding onComplete={() => { fetch("/api/organizations", { credentials: "include" }).then((r) => r.json()).then(setOrgs); }} />
+          )}
+          {view === "dashboard" && currentOrg && (
+            <Dashboard
+              organizationId={currentOrg.id}
+              onCreateTask={(wfId) => { setSelectedWorkflowId(wfId || ""); setView("create-task"); }}
+              onViewTask={(id) => { setSelectedTaskId(id); setView("task-detail"); }}
+            />
+          )}
+          {view === "create-task" && currentOrg && (
+            <TaskCreate
+              organizationId={currentOrg.id}
+              initialWorkflowId={selectedWorkflowId}
+              onCreated={(id) => { setSelectedTaskId(id); setView("task-detail"); }}
+              onCancel={() => setView("dashboard")}
+            />
+          )}
+          {view === "task-detail" && <TaskDetail taskId={selectedTaskId} onBack={() => setView("dashboard")} />}
+          {view === "organization" && currentOrg && <AgentBrowser organizationId={currentOrg.id} />}
+          {view === "agents" && currentOrg && <WorkflowManager organizationId={currentOrg.id} />}
+          {view === "agent-workflows" && currentOrg && <OrgManager organizationId={currentOrg.id} organizationName={currentOrg.name} />}
           {view === "rooms" && <RoomsManager />}
           {view === "intake" && (
             <>
