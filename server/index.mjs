@@ -1363,6 +1363,18 @@ app.get("/api/workflows", async (req, res) => {
       }
       result = filtered;
     }
+    // Attach canEdit flag: org creator or department leader
+    if (req.user && req.query.organizationId) {
+      const orgId = req.query.organizationId;
+      const [org] = await pool.execute("SELECT created_by FROM organizations WHERE id = ?", [orgId]);
+      const isOrgCreator = org.length > 0 && (org[0].created_by === req.user.id || org[0].created_by === req.user.email);
+      const [leaderDepts] = await pool.execute(
+        "SELECT id FROM departments WHERE organization_id = ? AND (leader_user_id = ? OR leader_user_id = ?)",
+        [orgId, req.user.id, req.user.email]
+      );
+      const canEdit = isOrgCreator || leaderDepts.length > 0;
+      result = result.map((wf) => ({ ...wf, canEdit }));
+    }
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1382,7 +1394,8 @@ app.get("/api/workflows/:id", async (req, res) => {
 
 app.post("/api/workflows", async (req, res) => {
   try {
-    const { name, description, organizationId, steps } = req.body;
+    if (!req.user) return res.status(401).json({ error: "Not logged in" });
+    const { name, description, organizationId, visibility, steps } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "name is required" });
     if (!steps || !Array.isArray(steps) || steps.length < 2) {
       return res.status(400).json({ error: "At least 2 steps are required" });
@@ -1404,6 +1417,22 @@ app.post("/api/workflows", async (req, res) => {
         "INSERT INTO workflow_steps (workflow_id, step_order, name, agent_id, description, output_description) VALUES (?, ?, ?, ?, ?, ?)",
         [id, i + 1, s.name.trim(), s.agentId.trim(), s.description || "", s.outputDescription || ""]
       );
+    }
+    // Set visibility permissions
+    const orgId = organizationId || "";
+    if (visibility === "all") {
+      await pool.execute("INSERT INTO workflow_permissions (workflow_id, organization_id, target_type) VALUES (?, ?, 'all')", [id, orgId]);
+    } else {
+      let userDeptId = null;
+      if (orgId) {
+        const [mem] = await pool.execute("SELECT department_id FROM org_members WHERE organization_id = ? AND user_id = ?", [orgId, req.user.id]);
+        if (mem.length > 0) userDeptId = mem[0].department_id;
+      }
+      if (userDeptId) {
+        await pool.execute("INSERT INTO workflow_permissions (workflow_id, organization_id, target_type, target_id) VALUES (?, ?, 'department', ?)", [id, orgId, userDeptId]);
+      } else {
+        await pool.execute("INSERT INTO workflow_permissions (workflow_id, organization_id, target_type) VALUES (?, ?, 'all')", [id, orgId]);
+      }
     }
     res.json({ success: true, id });
   } catch (e) {
@@ -1435,6 +1464,22 @@ app.put("/api/workflows/:id", async (req, res) => {
 
 app.delete("/api/workflows/:id", async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ error: "Not logged in" });
+    // Permission check: only org creator or department leader can delete
+    const [perms] = await pool.execute("SELECT organization_id FROM workflow_permissions WHERE workflow_id = ? LIMIT 1", [req.params.id]);
+    const [wf] = await pool.execute("SELECT organization_id FROM workflow_templates WHERE id = ?", [req.params.id]);
+    const orgId = perms.length > 0 ? perms[0].organization_id : (wf.length > 0 ? wf[0].organization_id : "");
+    if (orgId) {
+      const [org] = await pool.execute("SELECT created_by FROM organizations WHERE id = ?", [orgId]);
+      const isOrgCreator = org.length > 0 && (org[0].created_by === req.user.id || org[0].created_by === req.user.email);
+      if (!isOrgCreator) {
+        const [leaderDepts] = await pool.execute(
+          "SELECT id FROM departments WHERE organization_id = ? AND (leader_user_id = ? OR leader_user_id = ?)",
+          [orgId, req.user.id, req.user.email]
+        );
+        if (leaderDepts.length === 0) return res.status(403).json({ error: "Only department leaders or org admin can delete workflows" });
+      }
+    }
     await pool.execute("DELETE FROM workflow_steps WHERE workflow_id = ?", [req.params.id]);
     await pool.execute("DELETE FROM workflow_templates WHERE id = ?", [req.params.id]);
     await pool.execute("DELETE FROM workflow_permissions WHERE workflow_id = ?", [req.params.id]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCurrentUser } from "./AuthGuard";
 
 interface WorkflowTemplate {
   id: string;
@@ -8,6 +9,7 @@ interface WorkflowTemplate {
   description: string;
   stepCount: number;
   is_prebuilt: boolean;
+  canEdit?: boolean;
 }
 
 interface WorkflowStep {
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export default function WorkflowManager({ organizationId }: Props) {
+  const currentUser = useCurrentUser();
   const [workflows, setWorkflows] = useState<WorkflowTemplate[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -45,13 +48,15 @@ export default function WorkflowManager({ organizationId }: Props) {
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formSteps, setFormSteps] = useState<Array<{ name: string; agentId: string; description: string }>>([]);
+  const [formVisibility, setFormVisibility] = useState("department");
   const [creating, setCreating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const loadData = async () => {
+    const wfUrl = currentUser ? `/api/workflows?userId=${currentUser.id}&organizationId=${organizationId}` : "/api/workflows";
     const [wfs, ags] = await Promise.all([
-      fetch("/api/workflows").then((r) => r.json()),
-      fetch("/api/agents").then((r) => r.json()),
+      fetch(wfUrl, { credentials: "include" }).then((r) => r.json()),
+      fetch("/api/agents", { credentials: "include" }).then((r) => r.json()),
     ]);
     setWorkflows(wfs);
     setAgents(ags);
@@ -62,7 +67,10 @@ export default function WorkflowManager({ organizationId }: Props) {
 
   useEffect(() => {
     if (selectedId) {
-      fetch(`/api/workflows/${selectedId}`).then((r) => r.json()).then(setDetail).catch(() => {});
+      fetch(`/api/workflows/${selectedId}`, { credentials: "include" }).then((r) => r.json()).then((d) => {
+        const wf = workflows.find((w) => w.id === selectedId);
+        setDetail({ ...d, canEdit: wf?.canEdit });
+      }).catch(() => {});
     } else {
       setDetail(null);
     }
@@ -97,10 +105,12 @@ export default function WorkflowManager({ organizationId }: Props) {
       const res = await fetch("/api/workflows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           name: formName.trim(),
           description: formDesc.trim(),
           organizationId,
+          visibility: formVisibility,
           steps: formSteps.map((s) => ({
             name: s.name.trim() || `Step ${formSteps.indexOf(s) + 1}`,
             agentId: s.agentId,
@@ -114,6 +124,7 @@ export default function WorkflowManager({ organizationId }: Props) {
         setFormName("");
         setFormDesc("");
         setFormSteps([]);
+        setFormVisibility("department");
         await loadData();
       }
     } catch { /* ignore */ }
@@ -122,7 +133,7 @@ export default function WorkflowManager({ organizationId }: Props) {
 
   const handleDelete = async (id: string) => {
     setConfirmDeleteId(null);
-    await fetch(`/api/workflows/${id}`, { method: "DELETE" });
+    await fetch(`/api/workflows/${id}`, { method: "DELETE", credentials: "include" });
     if (selectedId === id) { setSelectedId(null); setDetail(null); }
     await loadData();
   };
@@ -158,7 +169,7 @@ export default function WorkflowManager({ organizationId }: Props) {
             <div className="wf-detail-content">
               <div className="wf-detail-header">
                 <h3>{detail.name}</h3>
-                {!detail.is_prebuilt && (
+                {!detail.is_prebuilt && detail.canEdit && (
                   <button className="btn-danger btn-small" onClick={() => setConfirmDeleteId(detail.id)}>Delete</button>
                 )}
               </div>
@@ -197,6 +208,14 @@ export default function WorkflowManager({ organizationId }: Props) {
             <div className="form-group">
               <label>Description</label>
               <input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="What does this workflow produce?" />
+            </div>
+
+            <div className="form-group">
+              <label>Visibility</label>
+              <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value)}>
+                <option value="department">My department only</option>
+                <option value="all">All members</option>
+              </select>
             </div>
 
             <div className="form-group">
