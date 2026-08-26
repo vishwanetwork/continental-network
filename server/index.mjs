@@ -1129,9 +1129,16 @@ app.delete("/api/agents/:id", async (req, res) => {
         if (leaderDepts.length === 0) return res.status(403).json({ error: "Only department leaders or org admin can delete agents" });
       }
     }
+    // Cascade: delete workflows that use this agent
+    const [affectedSteps] = await pool.execute("SELECT DISTINCT workflow_id FROM workflow_steps WHERE agent_id = ?", [req.params.id]);
+    for (const row of affectedSteps) {
+      await pool.execute("DELETE FROM workflow_steps WHERE workflow_id = ?", [row.workflow_id]);
+      await pool.execute("DELETE FROM workflow_templates WHERE id = ?", [row.workflow_id]);
+      await pool.execute("DELETE FROM workflow_permissions WHERE workflow_id = ?", [row.workflow_id]);
+    }
     await pool.execute("DELETE FROM agents WHERE id = ?", [req.params.id]);
     await pool.execute("DELETE FROM agent_permissions WHERE agent_id = ?", [req.params.id]);
-    res.json({ success: true });
+    res.json({ success: true, deletedWorkflows: affectedSteps.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
