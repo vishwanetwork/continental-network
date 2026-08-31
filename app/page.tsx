@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import RoomsManager from "./components/RoomsManager";
 import AuthGuard, { useCurrentUser } from "./components/AuthGuard";
 import OrgOnboarding from "./components/OrgOnboarding";
 import Dashboard from "./components/Dashboard";
@@ -10,6 +9,8 @@ import TaskDetail from "./components/TaskDetail";
 import AgentBrowser from "./components/AgentBrowser";
 import WorkflowManager from "./components/WorkflowManager";
 import OrgManager from "./components/OrgManager";
+import InviteCodeManager from "./components/InviteCodeManager";
+import AIModelSettings from "./components/AIModelSettings";
 
 type View =
   | "intake"
@@ -19,7 +20,6 @@ type View =
   | "deployment"
   | "contractors"
   | "quests"
-  | "rooms"
   | "ledger"
   | "docs"
   | "developer"
@@ -28,7 +28,9 @@ type View =
   | "agent-workflows"
   | "dashboard"
   | "create-task"
-  | "task-detail";
+  | "task-detail"
+  | "invite-codes"
+  | "ai-models";
 
 type QuoteMode = "BEST VALUE" | "HIGHEST SCORE" | "LOWEST COST" | "FASTEST";
 type Capability =
@@ -206,17 +208,18 @@ type RoomDefinition = {
   logs: RoomLog[];
 };
 
-const navItems: Array<{ code: string; label: string; view: View }> = [
-  { code: "01", label: "DASHBOARD", view: "dashboard" },
-  { code: "02", label: "WORKFLOWS", view: "agents" },
-  { code: "03", label: "AGENTS", view: "organization" },
-  { code: "04", label: "TEAM", view: "agent-workflows" },
-  { code: "05", label: "COMMAND", view: "intake" },
-  { code: "06", label: "CONTRACTORS", view: "contractors" },
-  { code: "07", label: "QUESTS", view: "quests" },
-  { code: "08", label: "ROOMS", view: "rooms" },
-  { code: "09", label: "LEDGER", view: "ledger" },
-  { code: "10", label: "DOCS", view: "docs" },
+const navItems: Array<{ code: string; label: string; view: View; requireSuperior?: boolean }> = [
+  { code: "", label: "DASHBOARD", view: "dashboard" },
+  { code: "", label: "WORKFLOWS", view: "agents" },
+  { code: "", label: "AGENTS", view: "organization" },
+  { code: "", label: "TEAM", view: "agent-workflows" },
+  { code: "", label: "AI MODELS", view: "ai-models" },
+  { code: "", label: "INVITE CODES", view: "invite-codes", requireSuperior: true },
+  { code: "", label: "COMMAND", view: "intake" },
+  { code: "", label: "CONTRACTORS", view: "contractors" },
+  { code: "", label: "QUESTS", view: "quests" },
+  { code: "", label: "LEDGER", view: "ledger" },
+  { code: "", label: "DOCS", view: "docs" },
 ];
 
 const initialNeedBriefFields: NeedBriefField[] = [
@@ -1654,11 +1657,22 @@ function HomeContent() {
   const [orgLoading, setOrgLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
+  const [userRole, setUserRole] = useState<{ isSuperior: boolean }>({ isSuperior: false });
 
   useEffect(() => {
     fetch("/api/organizations", { credentials: "include" })
       .then((r) => r.ok ? r.json() : [])
-      .then((data) => { setOrgs(data); setOrgLoading(false); })
+      .then((data) => {
+        setOrgs(data);
+        setOrgLoading(false);
+        // Fetch user role once we have the org
+        if (data.length > 0) {
+          fetch(`/api/organizations/${data[0].id}/my-role`, { credentials: "include" })
+            .then((r) => r.ok ? r.json() : { isSuperior: false })
+            .then((roleData) => setUserRole(roleData))
+            .catch(() => {});
+        }
+      })
       .catch(() => setOrgLoading(false));
   }, []);
 
@@ -2325,14 +2339,16 @@ function HomeContent() {
         <aside className="sidebar">
           <div className="nav-label">CATEGORY</div>
           <nav aria-label="Primary">
-            {navItems.map((item) => (
+            {navItems
+              .filter((item) => !item.requireSuperior || userRole.isSuperior)
+              .map((item) => (
               <button
                 className={`nav-item ${activeNav === item.view ? "active" : ""}`}
                 key={item.label}
                 onClick={() => setView(item.view)}
                 type="button"
               >
-                <span>{item.code}</span> {item.label}
+                {item.label}
               </button>
             ))}
           </nav>
@@ -2368,7 +2384,8 @@ function HomeContent() {
           {view === "organization" && currentOrg && <AgentBrowser organizationId={currentOrg.id} />}
           {view === "agents" && currentOrg && <WorkflowManager organizationId={currentOrg.id} />}
           {view === "agent-workflows" && currentOrg && <OrgManager organizationId={currentOrg.id} organizationName={currentOrg.name} />}
-          {view === "rooms" && <RoomsManager />}
+          {view === "invite-codes" && currentOrg && <InviteCodeManager organizationId={currentOrg.id} />}
+          {view === "ai-models" && <AIModelSettings />}
           {view === "intake" && (
             <>
               <div className="stage-heading">

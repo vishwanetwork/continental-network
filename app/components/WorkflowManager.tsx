@@ -52,6 +52,12 @@ export default function WorkflowManager({ organizationId }: Props) {
   const [creating, setCreating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // AI conversational creation
+  const [showAICreate, setShowAICreate] = useState(false);
+  const [aiDescription, setAIDescription] = useState("");
+  const [aiDesigning, setAIDesigning] = useState(false);
+  const [aiDesign, setAIDesign] = useState<{ name: string; description: string; steps: Array<{ name: string; agentId: string; description: string; createdAgent?: string }> } | null>(null);
+
   const loadData = async () => {
     const wfUrl = currentUser ? `/api/workflows?userId=${currentUser.id}&organizationId=${organizationId}` : "/api/workflows";
     const [wfs, ags] = await Promise.all([
@@ -96,6 +102,56 @@ export default function WorkflowManager({ organizationId }: Props) {
       }
       return { ...s, [field]: value };
     }));
+  };
+
+  const handleAIDesign = async () => {
+    if (!aiDescription.trim()) return;
+    setAIDesigning(true);
+    setAIDesign(null);
+    try {
+      const res = await fetch("/api/workflows/ai-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ description: aiDescription.trim(), organizationId }),
+      });
+      if (res.ok) {
+        const design = await res.json();
+        setAIDesign(design);
+      }
+    } catch { /* ignore */ }
+    setAIDesigning(false);
+  };
+
+  const handleConfirmAIDesign = async () => {
+    if (!aiDesign) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/workflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: aiDesign.name,
+          description: aiDesign.description,
+          organizationId,
+          visibility: "all",
+          steps: aiDesign.steps.map((s) => ({
+            name: s.name,
+            agentId: s.agentId,
+            description: s.description,
+            outputDescription: "",
+          })),
+        }),
+      });
+      if (res.ok) {
+        setShowAICreate(false);
+        setAIDesign(null);
+        setAIDescription("");
+        await loadData();
+      }
+    } catch { /* ignore */ }
+    setCreating(false);
   };
 
   const handleCreate = async () => {
@@ -144,9 +200,14 @@ export default function WorkflowManager({ organizationId }: Props) {
     <div className="wf-manager-container">
       <div className="wf-manager-header">
         <h2>Workflows</h2>
-        <button className="btn-primary" onClick={() => { setShowCreate(true); setFormSteps([{ name: agents[0]?.name || "", agentId: agents[0]?.id || "", description: "" }, { name: agents[1]?.name || agents[0]?.name || "", agentId: agents[1]?.id || agents[0]?.id || "", description: "" }]); }}>
-          + Create Workflow
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button className="btn-primary" onClick={() => setShowAICreate(true)}>
+            🤖 AI Create Workflow
+          </button>
+          <button className="btn-secondary" onClick={() => { setShowCreate(true); setFormSteps([{ name: agents[0]?.name || "", agentId: agents[0]?.id || "", description: "" }, { name: agents[1]?.name || agents[0]?.name || "", agentId: agents[1]?.id || agents[0]?.id || "", description: "" }]); }}>
+            + Manual Create
+          </button>
+        </div>
       </div>
 
       <div className="wf-manager-content">
@@ -259,6 +320,65 @@ export default function WorkflowManager({ organizationId }: Props) {
               <button className="btn-secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
               <button className="btn-danger" onClick={() => handleDelete(confirmDeleteId)}>Delete</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAICreate && (
+        <div className="modal-overlay" onClick={() => setShowAICreate(false)}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+            <h3>🤖 AI Create Workflow</h3>
+            <p style={{ color: "var(--muted)", fontSize: 12, margin: "8px 0 16px" }}>
+              Describe your goal. AI will analyze existing Agents and compose a workflow. New Agents will be auto-created if needed.
+            </p>
+
+            {!aiDesign ? (
+              <>
+                <div className="form-group">
+                  <label>Describe your goal</label>
+                  <textarea
+                    value={aiDescription}
+                    onChange={(e) => setAIDescription(e.target.value)}
+                    placeholder="e.g. I want a pipeline that auto-generates marketing videos: write script, create storyboard, then generate video..."
+                    rows={4}
+                  />
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-secondary" onClick={() => setShowAICreate(false)}>Cancel</button>
+                  <button className="btn-primary" onClick={handleAIDesign} disabled={aiDesigning || !aiDescription.trim()}>
+                    {aiDesigning ? "AI Analyzing..." : "Start Design"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ai-design-result">
+                  <h4>{aiDesign.name}</h4>
+                  <p style={{ color: "var(--muted)", fontSize: 12 }}>{aiDesign.description}</p>
+                  <div className="panel-title" style={{ marginTop: 12 }}>Designed Steps</div>
+                  <div className="wf-steps-list">
+                    {aiDesign.steps.map((step, i) => (
+                      <div key={i} className="wf-step-item">
+                        <div className="wf-step-number">{i + 1}</div>
+                        <div className="wf-step-info">
+                          <span className="wf-step-name">{step.name}</span>
+                          <span className="wf-step-agent">Agent: {getAgentName(step.agentId)}</span>
+                          {step.createdAgent && <span style={{ color: "var(--green)", fontSize: 10 }}>✨ New Agent: {step.createdAgent}</span>}
+                          {step.description && <span className="wf-step-desc">{step.description}</span>}
+                        </div>
+                        {i < aiDesign.steps.length - 1 && <div className="wf-step-arrow">↓</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-secondary" onClick={() => { setAIDesign(null); }}>Redesign</button>
+                  <button className="btn-primary" onClick={handleConfirmAIDesign} disabled={creating}>
+                    {creating ? "Creating..." : "Confirm & Create"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
