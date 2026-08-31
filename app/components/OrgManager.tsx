@@ -41,6 +41,8 @@ export default function OrgManager({ organizationId, organizationName }: Props) 
   const [showMoveMember, setShowMoveMember] = useState<string | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showSetLeader, setShowSetLeader] = useState(false);
+  const [showDeleteOrg, setShowDeleteOrg] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Forms
   const [deptName, setDeptName] = useState("");
@@ -162,7 +164,7 @@ export default function OrgManager({ organizationId, organizationName }: Props) 
     const res = await fetch(`/api/organizations/${organizationId}/leave`, { method: "POST", credentials: "include" });
     if (!res.ok) {
       const data = await res.json();
-      alert(data.error || "Cannot leave organization");
+      setErrorMsg(data.error || "Cannot leave organization");
       setOperating(false);
       return;
     }
@@ -213,8 +215,8 @@ export default function OrgManager({ organizationId, organizationName }: Props) 
         <h2>Team</h2>
         <div style={{ display: "flex", gap: "8px" }}>
           <button className="btn-primary" onClick={() => setShowCreateDept(true)}>+ Department</button>
-          <button className="btn-secondary" onClick={() => setShowAddMember(true)}>+ Member</button>
           <button className="btn-danger btn-small" onClick={() => setShowLeaveConfirm(true)}>Leave Org</button>
+          <button className="btn-danger btn-small" onClick={() => setShowDeleteOrg(true)}>Delete Org</button>
         </div>
       </div>
 
@@ -324,7 +326,7 @@ export default function OrgManager({ organizationId, organizationName }: Props) 
             </div>
             <div className="form-group">
               <label>Department (optional)</label>
-              <select value={selectedDeptId || ""} disabled>
+              <select value={selectedDeptId || ""} onChange={(e) => setSelectedDeptId(e.target.value || null)}>
                 <option value="">Unassigned</option>
                 {flatDepts().map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
@@ -386,6 +388,42 @@ export default function OrgManager({ organizationId, organizationName }: Props) 
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowLeaveConfirm(false)}>Cancel</button>
               <button className="btn-danger" onClick={handleLeave}>Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteOrg && (
+        <div className="modal-overlay" onClick={() => setShowDeleteOrg(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Organization</h3>
+            <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0" }}>Permanently delete this organization and all its data? This cannot be undone.</p>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setShowDeleteOrg(false)}>Cancel</button>
+              <button className="btn-danger" onClick={async () => {
+                setShowDeleteOrg(false);
+                setOperating(true);
+                const res = await fetch(`/api/organizations/${organizationId}`, { method: "DELETE", credentials: "include" });
+                if (res.ok) {
+                  window.location.reload();
+                } else {
+                  const data = await res.json();
+                  setErrorMsg(data.error || "Delete failed");
+                  setOperating(false);
+                }
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="modal-overlay" onClick={() => setErrorMsg("")}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Error</h3>
+            <p style={{ color: "var(--muted)", fontSize: 12, margin: "12px 0" }}>{errorMsg}</p>
+            <div className="modal-actions">
+              <button className="btn-primary" onClick={() => setErrorMsg("")}>OK</button>
             </div>
           </div>
         </div>
