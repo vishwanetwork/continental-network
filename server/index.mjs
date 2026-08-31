@@ -58,6 +58,7 @@ const pool = mysql.createPool({
   database: "workflow",
   waitForConnections: true,
   connectionLimit: 10,
+  ssl: process.env.DB_SSL === "false" ? false : { rejectUnauthorized: false },
 });
 
 // Initialize table schema
